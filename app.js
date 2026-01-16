@@ -4,7 +4,6 @@ let currentImage = null;
 let rotation = 0;
 let gridConfig = { ox: 0, oy: 0, uw: 0, uh: 0 };
 
-// 1. 画像読み込み
 document.getElementById('imageInput').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -14,7 +13,7 @@ document.getElementById('imageInput').addEventListener('change', (e) => {
         img.onload = () => {
             currentImage = img;
             rotation = 0;
-            gridConfig = { ox: 0, oy: 0, uw: 0, uh: 0 }; // リセット
+            gridConfig = { ox: 0, oy: 0, uw: 0, uh: 0 };
             drawPreview();
         };
         img.src = event.target.result;
@@ -32,13 +31,11 @@ function drawPreview() {
     const is90 = rotation === 90 || rotation === 270;
     canvas.width = is90 ? currentImage.height : currentImage.width;
     canvas.height = is90 ? currentImage.width : currentImage.height;
-    
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.rotate((rotation * Math.PI) / 180);
     ctx.drawImage(currentImage, -currentImage.width / 2, -currentImage.height / 2);
     ctx.restore();
-
     if (gridConfig.uw > 0) drawGuide();
 }
 
@@ -48,51 +45,49 @@ function drawGuide() {
     ctx.strokeRect(gridConfig.ox, gridConfig.oy, gridConfig.uw, gridConfig.uh);
 }
 
-// 2. 🎯 高速自動検知 ＋ 解析エンジン
+// 🎯 超高速スキャン版 解析エンジン
 async function startAnalysis() {
     if (!currentImage) return alert("画像を選んでください");
     const btn = document.getElementById('analyzeBtn');
-    btn.innerText = "位置を特定中...";
+    btn.innerText = "位置特定中...";
     btn.disabled = true;
 
-    // --- STEP 1: 高速アンカーサーチ (限定エリアスキャン) ---
+    // 軽量なWorkerを作成
     const worker = await Tesseract.createWorker('eng');
-    
-    // 左端の25%・上端の40%だけを切り出した一時的なキャンバスを作成
-    const scanCanvas = document.createElement('canvas');
-    scanCanvas.width = canvas.width * 0.25;
-    scanCanvas.height = canvas.height * 0.4;
-    const sCtx = scanCanvas.getContext('2d');
-    sCtx.drawImage(canvas, 0, 0, canvas.width * 0.25, canvas.height * 0.4, 0, 0, scanCanvas.width, scanCanvas.height);
 
-    // 「1」という文字だけを狙い撃ちで探す設定
+    // --- STEP 1: 指定された範囲（横10%・縦50%）で高速スキャン ---
+    const scanCanvas = document.createElement('canvas');
+    scanCanvas.width = canvas.width * 0.10; // 横10%
+    scanCanvas.height = canvas.height * 0.50; // 縦50%
+    const sCtx = scanCanvas.getContext('2d');
+    sCtx.drawImage(canvas, 0, 0, canvas.width * 0.10, canvas.height * 0.50, 0, 0, scanCanvas.width, scanCanvas.height);
+
     await worker.setParameters({
         tessedit_char_whitelist: '1',
-        tessedit_pageseg_mode: '11' // SPARSE_TEXT
+        tessedit_pageseg_mode: '11'
     });
 
     const { data } = await worker.recognize(scanCanvas);
     const firstOne = data.words.find(w => w.text.includes("1"));
 
     if (firstOne) {
-        // 目印が見つかったら、そこを起点にグリッドを自動計算
-        gridConfig.ox = firstOne.bbox.x1 + (canvas.width * 0.02);
+        // 見つかった場合はそこを起点にする
+        gridConfig.ox = firstOne.bbox.x1 + (canvas.width * 0.05);
         gridConfig.oy = firstOne.bbox.y0;
-        gridConfig.uw = canvas.width * 0.92 - gridConfig.ox;
-        gridConfig.uh = canvas.height * 0.88 - gridConfig.oy;
-        drawPreview(); // 赤枠を表示
+        gridConfig.uw = canvas.width * 0.90 - gridConfig.ox;
+        gridConfig.uh = canvas.height * 0.85 - gridConfig.oy;
     } else {
-        // 見つからない場合は標準比率を使用
+        // 見つからない場合は即座に標準設定（待たせない）
         gridConfig = {
-            ox: canvas.width * 0.15,
-            oy: canvas.height * 0.12,
-            uw: canvas.width * 0.8,
-            uh: canvas.height * 0.75
+            ox: canvas.width * 0.18,
+            oy: canvas.height * 0.15,
+            uw: canvas.width * 0.78,
+            uh: canvas.height * 0.70
         };
-        console.log("アンカー未検出。標準設定を適用。");
     }
+    drawPreview();
 
-    // --- STEP 2: 各マスの詳細解析 (Workerを使い回し) ---
+    // --- STEP 2: 各マスの解析 ---
     btn.innerText = "データ解析中...";
     await worker.setParameters({ tessedit_char_whitelist: '0123456789' });
 
@@ -108,11 +103,10 @@ async function startAnalysis() {
             const cCtx = cellCanvas.getContext('2d');
             cCtx.drawImage(canvas, gridConfig.ox + (c * cellW), gridConfig.oy + (r * cellH), cellW, cellH, 0, 0, 100, 100);
 
-            // 二値化処理
+            // 二値化（高速版）
             const imgData = cCtx.getImageData(0, 0, 100, 100);
             for (let i = 0; i < imgData.data.length; i += 4) {
-                const avg = (imgData.data[i] + imgData.data[i+1] + imgData.data[i+2]) / 3;
-                const v = avg > 145 ? 255 : 0;
+                const v = ((imgData.data[i] + imgData.data[i+1] + imgData.data[i+2]) / 3) > 140 ? 255 : 0;
                 imgData.data[i] = imgData.data[i+1] = imgData.data[i+2] = v;
             }
             cCtx.putImageData(imgData, 0, 0);
@@ -134,6 +128,7 @@ async function startAnalysis() {
     document.getElementById('scoreRows').scrollIntoView({ behavior: 'smooth' });
 }
 
+// 以下、calcTotalsとwindow.onloadは前回と同じ
 function calcTotals() {
     [1,2,3,4].forEach(p => {
         let pTotal = 0;
@@ -156,11 +151,10 @@ window.onload = () => {
         const row = document.createElement('div');
         row.className = 'score-grid items-center border-b border-gray-100 pb-1';
         row.innerHTML = `<div class="text-center font-mono text-[10px] text-gray-400">${i}</div>
-            ${[1,2,3,4].map(p => `
-                <div class="player-col">
-                    <input type="number" class="p${p}-plus r${i} w-full text-center text-sm p-2 bg-blue-50 outline-none" placeholder="0" oninput="calcTotals()">
-                    <input type="number" class="p${p}-minus r${i} w-full text-center text-sm p-2 bg-red-50 outline-none" placeholder="0" oninput="calcTotals()">
-                </div>`).join('')}`;
+            ${[1,2,3,4].map(p => `<div class="player-col">
+                <input type="number" class="p${p}-plus r${i} w-full text-center text-sm p-2 bg-blue-50 outline-none" placeholder="0" oninput="calcTotals()">
+                <input type="number" class="p${p}-minus r${i} w-full text-center text-sm p-2 bg-red-50 outline-none" placeholder="0" oninput="calcTotals()">
+            </div>`).join('')}`;
         scoreRows.appendChild(row);
     }
 };

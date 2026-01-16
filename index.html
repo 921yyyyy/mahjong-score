@@ -10,129 +10,175 @@
         .score-grid { grid-template-columns: 3rem 1fr 1fr 1fr 1fr; }
     </style>
 </head>
-<body class="bg-gray-100 p-2 pb-20">
+<body class="bg-gray-100 p-2 pb-20 text-gray-800">
 
-    <div class="max-w-2xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden">
+    <div class="max-w-2xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden mb-6">
         <div class="bg-green-700 p-4 text-white flex justify-between items-center">
             <h1 class="text-xl font-bold">🀄 スコア記録帳</h1>
-            <input type="text" id="setName" placeholder="セット名（例：1/16 友人宅）" class="bg-green-800 text-sm border-none rounded px-2 py-1 text-white placeholder-green-300">
+            <input type="text" id="setName" placeholder="セット名（例：1/16 友人宅）" class="bg-green-800 text-sm border-none rounded px-2 py-1 text-white placeholder-green-300 w-1/2">
         </div>
 
-        <div class="p-4 border-b bg-green-50">
-            <label class="block text-xs font-bold text-green-700 mb-1">📷 シートを丸ごとスキャン</label>
-            <input type="file" id="imageInput" accept="image/*" capture="environment" class="w-full text-xs">
-            <div id="status" class="text-[10px] text-blue-600 mt-1 hidden">解析中...</div>
+        <div class="p-3 border-b bg-green-50 flex gap-2">
+            <div class="flex-1">
+                <label class="block text-[10px] font-bold text-green-700">📷 シートスキャン</label>
+                <input type="file" id="imageInput" accept="image/*" capture="environment" class="text-xs w-full">
+            </div>
+            <button onclick="clearBoard()" class="text-xs bg-gray-200 px-2 rounded">クリア</button>
         </div>
 
-        <div class="p-2 overflow-x-auto">
-            <div class="score-grid grid gap-1 text-center font-bold text-xs border-b pb-2 mb-2 bg-gray-100 p-1">
+        <div id="status" class="text-center text-blue-600 py-1 text-[10px] hidden italic bg-blue-50">解析中...</div>
+
+        <div class="p-2">
+            <div class="score-grid grid gap-1 text-center font-bold text-xs border-b pb-1 mb-1 bg-gray-100 p-1">
                 <div>回</div><div>A</div><div>B</div><div>C</div><div>D</div>
             </div>
             <div id="scoreRows" class="space-y-1">
                 </div>
+            <div class="score-grid grid gap-1 text-center font-bold text-sm mt-2 p-1 bg-yellow-50 border-t-2 border-yellow-200">
+                <div class="text-[10px] flex items-center justify-center">計</div>
+                <div id="totalP1">0</div><div id="totalP2">0</div><div id="totalP3">0</div><div id="totalP4">0</div>
+            </div>
         </div>
 
-        <div class="p-4 bg-gray-50 border-t flex justify-between items-center">
-            <div class="text-sm font-bold">合計: <span id="boardTotal">0</span></div>
-            <button onclick="saveSheet()" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold shadow-md">GitHubにシートを保存</button>
+        <div class="p-4 bg-gray-50 flex justify-between items-center">
+            <div class="text-[10px] text-gray-400">※0以外の行を保存します</div>
+            <button onclick="saveSheet()" class="bg-green-600 text-white px-8 py-2 rounded-full font-bold shadow-lg active:scale-95 transition">シート保存</button>
         </div>
     </div>
 
-    <div id="historyArea" class="max-w-2xl mx-auto mt-6 space-y-4"></div>
+    <div class="max-w-2xl mx-auto">
+        <h2 class="font-bold text-gray-600 mb-2 px-2 flex items-center gap-2">
+            <span>📅 過去の対戦履歴</span>
+            <button onclick="loadHistory()" class="text-[10px] bg-white border px-2 py-0.5 rounded shadow-sm">更新</button>
+        </h2>
+        <div id="historyList" class="grid grid-cols-1 gap-2 px-2">
+            </div>
+    </div>
 
     <script>
         const repo = "921yyyyy/mahjong-score";
         const path = "data.json";
 
-        // 8行の入力欄を生成
+        // --- 初期化: 8行の入力欄を生成 ---
         const scoreRows = document.getElementById('scoreRows');
         for (let i = 1; i <= 8; i++) {
             const row = document.createElement('div');
             row.className = 'score-grid grid gap-1';
             row.innerHTML = `
-                <div class="flex items-center justify-center text-xs bg-gray-200 rounded">${i}</div>
-                <input type="number" class="p1 r${i} w-full border text-center text-sm p-1 rounded">
-                <input type="number" class="p2 r${i} w-full border text-center text-sm p-1 rounded">
-                <input type="number" class="p3 r${i} w-full border text-center text-sm p-1 rounded">
-                <input type="number" class="p4 r${i} w-full border text-center text-sm p-1 rounded">
+                <div class="flex items-center justify-center text-xs bg-gray-200 rounded font-mono">${i}</div>
+                <input type="number" class="p1 r${i} w-full border text-center text-sm p-1.5 rounded focus:ring-1 focus:ring-green-500 outline-none" oninput="calcTotals()">
+                <input type="number" class="p2 r${i} w-full border text-center text-sm p-1.5 rounded focus:ring-1 focus:ring-green-500 outline-none" oninput="calcTotals()">
+                <input type="number" class="p3 r${i} w-full border text-center text-sm p-1.5 rounded focus:ring-1 focus:ring-green-500 outline-none" oninput="calcTotals()">
+                <input type="number" class="p4 r${i} w-full border text-center text-sm p-1.5 rounded focus:ring-1 focus:ring-green-500 outline-none" oninput="calcTotals()">
             `;
             scoreRows.appendChild(row);
         }
 
-        // OCR一括反映ロジック
+        function calcTotals() {
+            [1,2,3,4].forEach(p => {
+                const sum = Array.from(document.querySelectorAll(`.p${p}`)).reduce((a, b) => a + (parseInt(b.value) || 0), 0);
+                const el = document.getElementById(`totalP1 totalP2 totalP3 totalP4`.split(' ')[p-1]);
+                el.innerText = (sum > 0 ? '+' : '') + sum;
+                el.className = sum >= 0 ? 'text-blue-600' : 'text-red-500';
+            });
+        }
+
+        function clearBoard() {
+            if(!confirm("ボードを空にしますか？")) return;
+            document.querySelectorAll('#scoreRows input').forEach(i => i.value = '');
+            document.getElementById('setName').value = '';
+            calcTotals();
+        }
+
+        // --- OCR処理 ---
         document.getElementById('imageInput').addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            const status = document.getElementById('status');
-            status.classList.remove('hidden'); status.innerText = "シート全体を解析中...";
-
+            const st = document.getElementById('status');
+            st.classList.remove('hidden');
             const { data: { text } } = await Tesseract.recognize(file, 'eng');
-            const numbers = text.match(/-?\d+/g)?.map(Number) || [];
-            
-            // 読み取った数字を上から順に全てのセルに流し込む（理想への第一歩）
-            const allInputs = document.querySelectorAll('#scoreRows input');
-            numbers.forEach((num, index) => {
-                if (index < allInputs.length) allInputs[index].value = num;
+            const nums = text.match(/-?\d+/g)?.map(Number) || [];
+            document.querySelectorAll('#scoreRows input').forEach((inp, idx) => {
+                if (idx < nums.length) inp.value = nums[idx];
             });
-
-            status.innerText = "スキャン完了。誤字を修正してください。";
+            st.classList.add('hidden');
+            calcTotals();
         });
 
+        // --- GitHub保存 ---
         async function saveSheet() {
             const token = prompt("GitHubトークンを入力");
             if (!token) return;
-
             const setName = document.getElementById('setName').value || new Date().toLocaleDateString();
             const rows = [];
             for (let i = 1; i <= 8; i++) {
                 const vals = Array.from(document.querySelectorAll(`.r${i}`)).map(el => parseInt(el.value) || 0);
                 if (vals.some(v => v !== 0)) rows.push(vals);
             }
-
-            const newSheet = { date: new Date().toLocaleString(), name: setName, data: rows };
-
+            const newSheet = { id: Date.now(), date: new Date().toLocaleString('ja-JP'), name: setName, data: rows };
             try {
                 const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
                     headers: { "Authorization": `token ${token}` }
                 });
-                const fileData = await res.json();
-                let content = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
+                const fData = await res.json();
+                let content = JSON.parse(decodeURIComponent(escape(atob(fData.content))));
                 content.push(newSheet);
-
                 await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
                     method: "PUT",
                     headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        message: "Add full sheet",
+                        message: "Save sheet",
                         content: btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2)))),
-                        sha: fileData.sha
+                        sha: fData.sha
                     })
                 });
-                alert("シートを保存しました！");
-                location.reload();
+                alert("保存完了！");
+                loadHistory();
             } catch (e) { alert("エラー: " + e.message); }
         }
 
+        // --- 履歴読み込みと再現 ---
         async function loadHistory() {
-            const historyArea = document.getElementById('historyArea');
+            const list = document.getElementById('historyList');
+            list.innerHTML = "<p class='text-xs text-center p-4'>データ取得中...</p>";
             try {
                 const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`);
-                const fileData = await res.json();
-                const data = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
-
-                historyArea.innerHTML = data.reverse().map(sheet => `
-                    <div class="bg-white shadow rounded-lg p-4">
-                        <div class="text-sm font-bold border-b pb-2 mb-2 text-green-800">${sheet.name} (${sheet.date})</div>
-                        <table class="w-full text-xs text-center">
-                            <tr class="bg-gray-100"><th>回</th><th>A</th><th>B</th><th>C</th><th>D</th></tr>
-                            ${sheet.data.map((row, i) => `
-                                <tr><td>${i+1}</td>${row.map(s => `<td>${s}</td>`).join('')}</tr>
-                            `).join('')}
-                        </table>
-                    </div>
-                `).join('');
-            } catch (e) { console.log(e); }
+                const fData = await res.json();
+                const data = JSON.parse(decodeURIComponent(escape(atob(fData.content))));
+                
+                list.innerHTML = data.reverse().map(sheet => {
+                    const totals = [0,0,0,0];
+                    sheet.data.forEach(r => r.forEach((v, i) => totals[i] += v));
+                    return `
+                        <div class="bg-white p-3 rounded-lg shadow-sm border-l-4 border-green-600 flex justify-between items-center active:bg-gray-50" onclick='viewSheet(${JSON.stringify(sheet)})'>
+                            <div class="flex-1">
+                                <div class="text-[10px] text-gray-400">${sheet.date}</div>
+                                <div class="text-sm font-bold">${sheet.name}</div>
+                                <div class="flex gap-2 mt-1">
+                                    ${totals.map(t => `<span class="text-[10px] ${t>=0?'text-blue-500':'text-red-400'} font-mono">${t>=0?'+':''}${t}</span>`).join('')}
+                                </div>
+                            </div>
+                            <div class="text-gray-300">❯</div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) { list.innerHTML = "読み込みエラー"; }
         }
+
+        // 履歴をタップした時にボードに再現する
+        window.viewSheet = function(sheet) {
+            if(!confirm("選択したシートをボードに展開しますか？（現在の入力は消えます）")) return;
+            document.getElementById('setName').value = sheet.name;
+            document.querySelectorAll('#scoreRows input').forEach(i => i.value = ''); // 一旦クリア
+            sheet.data.forEach((rowVals, rowIdx) => {
+                rowVals.forEach((val, pIdx) => {
+                    document.querySelector(`.p${pIdx+1}.r${rowIdx+1}`).value = val;
+                });
+            });
+            calcTotals();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
         window.onload = loadHistory;
     </script>
 </body>

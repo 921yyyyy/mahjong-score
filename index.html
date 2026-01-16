@@ -2,192 +2,36 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>麻雀シートDX-Real</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>麻雀DXスコアラー</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src='https://unpkg.com/tesseract.js@v4.0.1/dist/tesseract.min.js'></script>
-    <style>
-        .score-grid { 
-            display: grid;
-            grid-template-columns: 2.5rem repeat(4, 1fr); 
-            gap: 2px;
-        }
-        .player-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; }
-        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-gray-100 pb-20 text-gray-800">
-
+<body class="bg-gray-100 pb-20">
     <div class="max-w-2xl mx-auto bg-white shadow-xl min-h-screen">
         <div class="bg-green-800 p-4 text-white">
-            <div class="flex justify-between items-center mb-2">
-                <h1 class="text-lg font-bold">🀄 スコア記録帳 (2列形式)</h1>
-                <input type="text" id="setName" placeholder="1/16 友人宅" class="bg-green-900 text-sm border-none rounded px-2 py-1 w-32 outline-none">
+            <h1 class="text-lg font-bold mb-3">🀄 高精度グリッド解析モード</h1>
+            <div class="space-y-3">
+                <input type="file" id="imageInput" accept="image/*" class="text-xs w-full bg-green-700 p-2 rounded">
+                <div class="flex gap-2">
+                    <button onclick="rotateImage()" class="flex-1 bg-blue-600 py-2 rounded text-xs font-bold">↻ 90度回転</button>
+                    <button onclick="startAnalysis()" id="analyzeBtn" class="flex-1 bg-yellow-500 py-2 rounded text-xs text-black font-bold">🎯 解析開始</button>
+                </div>
             </div>
-            <div class="flex gap-2 items-center bg-green-700 p-2 rounded text-xs">
-                <span>📷 解析:</span>
-                <input type="file" id="imageInput" accept="image/*" class="flex-1">
+            <div class="mt-3 flex justify-center bg-black rounded overflow-hidden relative">
+                <canvas id="previewCanvas" class="max-w-full h-auto"></canvas>
             </div>
-            <div id="status" class="text-[10px] text-yellow-200 mt-1 hidden italic">解析中... 10秒ほどお待ちください</div>
         </div>
 
-        <div class="score-grid bg-gray-200 p-1 border-b sticky top-0 z-10">
-            <div class="flex items-center justify-center text-[10px] font-bold">回</div>
-            <div class="player-col"><div class="col-span-2 text-center border-b border-gray-400 font-bold">A</div><div class="text-[9px] bg-blue-50 text-center">+</div><div class="text-[9px] bg-red-50 text-center">-</div></div>
-            <div class="player-col"><div class="col-span-2 text-center border-b border-gray-400 font-bold">B</div><div class="text-[9px] bg-blue-50 text-center">+</div><div class="text-[9px] bg-red-50 text-center">-</div></div>
-            <div class="player-col"><div class="col-span-2 text-center border-b border-gray-400 font-bold">C</div><div class="text-[9px] bg-blue-50 text-center">+</div><div class="text-[9px] bg-red-50 text-center">-</div></div>
-            <div class="player-col"><div class="col-span-2 text-center border-b border-gray-400 font-bold">D</div><div class="text-[9px] bg-blue-50 text-center">+</div><div class="text-[9px] bg-red-50 text-center">-</div></div>
-        </div>
-
+        <div id="scoreGridHeader" class="sticky top-0 z-10"></div>
         <div id="scoreRows" class="p-1 space-y-1"></div>
 
-        <div class="p-4 bg-yellow-50 border-t-2 border-yellow-200 sticky bottom-0">
-            <div class="score-grid mb-4">
-                <div class="flex items-center justify-center font-bold text-xs italic">計</div>
-                <div id="totalA" class="text-center font-mono font-bold text-sm">0</div>
-                <div id="totalB" class="text-center font-mono font-bold text-sm">0</div>
-                <div id="totalC" class="text-center font-mono font-bold text-sm">0</div>
-                <div id="totalD" class="text-center font-mono font-bold text-sm">0</div>
-            </div>
-            <div class="flex gap-2">
-                <button onclick="clearBoard()" class="flex-1 bg-gray-200 py-3 rounded-xl font-bold text-sm">クリア</button>
-                <button onclick="saveSheet()" class="flex-[2] bg-green-700 text-white py-3 rounded-xl font-bold shadow-lg">シートを保存</button>
-            </div>
+        <div class="p-4 bg-yellow-50 border-t sticky bottom-0 z-20">
+            <div id="totals" class="grid grid-cols-4 gap-2 mb-4 text-center font-bold font-mono"></div>
+            <button onclick="saveSheet()" class="w-full bg-green-700 text-white py-3 rounded-xl font-bold">データを保存</button>
         </div>
-
-        <div id="historyList" class="p-4 space-y-3 bg-gray-50"></div>
     </div>
-
-    <script>
-        const repo = "921yyyyy/mahjong-score";
-        const path = "data.json";
-
-        // 行の生成
-        const scoreRows = document.getElementById('scoreRows');
-        for (let i = 1; i <= 8; i++) {
-            const row = document.createElement('div');
-            row.className = 'score-grid items-center border-b border-gray-50 pb-1';
-            row.innerHTML = `
-                <div class="text-center font-mono text-xs text-gray-400">${i}</div>
-                ${[1,2,3,4].map(p => `
-                    <div class="player-col items-center">
-                        <input type="number" class="p${p}-plus r${i} w-full text-center text-sm p-1.5 bg-blue-50 rounded-l border-r border-white outline-none focus:bg-blue-100" placeholder="0" oninput="calcTotals()">
-                        <input type="number" class="p${p}-minus r${i} w-full text-center text-sm p-1.5 bg-red-50 rounded-r outline-none focus:bg-red-100" placeholder="0" oninput="calcTotals()">
-                    </div>
-                `).join('')}
-                <div class="col-start-2 col-span-4 flex justify-end px-1">
-                    <button onclick="assistZero(${i})" class="text-[9px] bg-white border border-gray-300 px-2 py-0.5 rounded shadow-sm text-gray-500 mt-0.5">残りを自動入力</button>
-                </div>
-            `;
-            scoreRows.appendChild(row);
-        }
-
-        // --- OCR（解析）処理の追加 ---
-        document.getElementById('imageInput').addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const status = document.getElementById('status');
-            status.classList.remove('hidden');
-
-            try {
-                // Tesseractで画像内の全テキストを認識
-                const { data: { text } } = await Tesseract.recognize(file, 'eng');
-                // 数字（1〜3桁程度）だけを取り出す
-                const numbers = text.match(/\d+/g)?.map(Number) || [];
-                
-                // 全入力欄（プラスとマイナスが交互に並ぶ）を取得
-                const allInputs = document.querySelectorAll('#scoreRows input');
-                
-                // 読み取った順に流し込む
-                numbers.forEach((num, index) => {
-                    if (index < allInputs.length) {
-                        allInputs[index].value = num;
-                    }
-                });
-
-                status.innerText = "解析完了！";
-                setTimeout(() => status.classList.add('hidden'), 3000);
-                calcTotals();
-            } catch (err) {
-                alert("解析中にエラーが発生しました");
-                status.classList.add('hidden');
-            }
-        });
-
-        function calcTotals() {
-            [1,2,3,4].forEach(p => {
-                let pTotal = 0;
-                for(let i=1; i<=8; i++) {
-                    const plus = parseInt(document.querySelector(`.p${p}-plus.r${i}`).value) || 0;
-                    const minus = parseInt(document.querySelector(`.p${p}-minus.r${i}`).value) || 0;
-                    pTotal += (plus - minus);
-                }
-                const el = document.getElementById(`total${'ABCD'[p-1]}`);
-                el.innerText = (pTotal > 0 ? '+' : '') + pTotal;
-                el.className = `text-center font-mono font-bold text-sm ${pTotal >= 0 ? 'text-blue-600' : 'text-red-500'}`;
-            });
-        }
-
-        function assistZero(rowIdx) {
-            const rowScores = [1,2,3,4].map(p => {
-                const plus = parseInt(document.querySelector(`.p${p}-plus.r${rowIdx}`).value) || 0;
-                const minus = parseInt(document.querySelector(`.p${p}-minus.r${rowIdx}`).value) || 0;
-                return plus - minus;
-            });
-            const currentSum = rowScores.reduce((a, b) => a + b, 0);
-            if (currentSum === 0) return;
-
-            for(let p=1; p<=4; p++) {
-                const plusVal = document.querySelector(`.p${p}-plus.r${rowIdx}`).value;
-                const minusVal = document.querySelector(`.p${p}-minus.r${rowIdx}`).value;
-                if (!plusVal && !minusVal) {
-                    const diff = -currentSum;
-                    if (diff > 0) document.querySelector(`.p${p}-plus.r${rowIdx}`).value = diff;
-                    else document.querySelector(`.p${p}-minus.r${rowIdx}`).value = Math.abs(diff);
-                    break;
-                }
-            }
-            calcTotals();
-        }
-
-        async function saveSheet() {
-            const token = prompt("GitHubトークン"); if (!token) return;
-            const data = [];
-            for (let i = 1; i <= 8; i++) {
-                const row = [1,2,3,4].map(p => {
-                    const plus = parseInt(document.querySelector(`.p${p}-plus.r${i}`).value) || 0;
-                    const minus = parseInt(document.querySelector(`.p${p}-minus.r${i}`).value) || 0;
-                    return plus - minus;
-                });
-                if (row.some(v => v !== 0)) data.push(row);
-            }
-            const newSheet = { id: Date.now(), date: new Date().toLocaleString('ja-JP'), name: document.getElementById('setName').value || "無題", data };
-            try {
-                const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, { headers: { "Authorization": `token ${token}` } });
-                const fData = await res.json();
-                let content = JSON.parse(decodeURIComponent(escape(atob(fData.content))));
-                content.push(newSheet);
-                await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
-                    method: "PUT",
-                    headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: "Save sheet", content: btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2)))), sha: fData.sha })
-                });
-                alert("保存完了！"); location.reload();
-            } catch (e) { alert(e.message); }
-        }
-
-        function clearBoard() { if(confirm("クリアしますか？")) location.reload(); }
-
-        window.onload = async () => {
-            const list = document.getElementById('historyList');
-            try {
-                const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`);
-                const fData = await res.json();
-                const data = JSON.parse(decodeURIComponent(escape(atob(fData.content))));
-                list.innerHTML = `<h2 class="text-xs font-bold text-gray-500 mb-2">最近の履歴</h2>` + 
-                    data.reverse().slice(0, 5).map(s => `<div class="bg-white p-2 rounded shadow-sm text-[10px] border-l-2 border-green-600"><b>${s.name}</b> <span class="text-gray-400">(${s.date})</span></div>`).join('');
-            } catch(e) {}
-        };
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>

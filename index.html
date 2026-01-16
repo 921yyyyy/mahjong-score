@@ -7,7 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src='https://unpkg.com/tesseract.js@v4.0.1/dist/tesseract.min.js'></script>
     <style>
-        /* 1人あたり2列(+,-) × 4人 + 回数(3rem) */
         .score-grid { 
             display: grid;
             grid-template-columns: 2.5rem repeat(4, 1fr); 
@@ -26,21 +25,21 @@
                 <input type="text" id="setName" placeholder="1/16 友人宅" class="bg-green-900 text-sm border-none rounded px-2 py-1 w-32 outline-none">
             </div>
             <div class="flex gap-2 items-center bg-green-700 p-2 rounded text-xs">
-                <span>📷 スキャン:</span>
+                <span>📷 解析:</span>
                 <input type="file" id="imageInput" accept="image/*" class="flex-1">
             </div>
+            <div id="status" class="text-[10px] text-yellow-200 mt-1 hidden italic">解析中... 10秒ほどお待ちください</div>
         </div>
 
         <div class="score-grid bg-gray-200 p-1 border-b sticky top-0 z-10">
             <div class="flex items-center justify-center text-[10px] font-bold">回</div>
-            <div class="player-col"><div class="col-span-2 text-center border-b border-gray-400">A</div><div class="text-[9px] bg-blue-50">+</div><div class="text-[9px] bg-red-50">-</div></div>
-            <div class="player-col"><div class="col-span-2 text-center border-b border-gray-400">B</div><div class="text-[9px] bg-blue-50">+</div><div class="text-[9px] bg-red-50">-</div></div>
-            <div class="player-col"><div class="col-span-2 text-center border-b border-gray-400">C</div><div class="text-[9px] bg-blue-50">+</div><div class="text-[9px] bg-red-50">-</div></div>
-            <div class="player-col"><div class="col-span-2 text-center border-b border-gray-400">D</div><div class="text-[9px] bg-blue-50">+</div><div class="text-[9px] bg-red-50">-</div></div>
+            <div class="player-col"><div class="col-span-2 text-center border-b border-gray-400 font-bold">A</div><div class="text-[9px] bg-blue-50 text-center">+</div><div class="text-[9px] bg-red-50 text-center">-</div></div>
+            <div class="player-col"><div class="col-span-2 text-center border-b border-gray-400 font-bold">B</div><div class="text-[9px] bg-blue-50 text-center">+</div><div class="text-[9px] bg-red-50 text-center">-</div></div>
+            <div class="player-col"><div class="col-span-2 text-center border-b border-gray-400 font-bold">C</div><div class="text-[9px] bg-blue-50 text-center">+</div><div class="text-[9px] bg-red-50 text-center">-</div></div>
+            <div class="player-col"><div class="col-span-2 text-center border-b border-gray-400 font-bold">D</div><div class="text-[9px] bg-blue-50 text-center">+</div><div class="text-[9px] bg-red-50 text-center">-</div></div>
         </div>
 
-        <div id="scoreRows" class="p-1 space-y-1">
-            </div>
+        <div id="scoreRows" class="p-1 space-y-1"></div>
 
         <div class="p-4 bg-yellow-50 border-t-2 border-yellow-200 sticky bottom-0">
             <div class="score-grid mb-4">
@@ -72,8 +71,8 @@
                 <div class="text-center font-mono text-xs text-gray-400">${i}</div>
                 ${[1,2,3,4].map(p => `
                     <div class="player-col items-center">
-                        <input type="number" class="p${p}-plus r${i} w-full text-center text-sm p-1 bg-blue-50 rounded-l border-r border-white outline-none focus:bg-blue-100" placeholder="0" oninput="onInputChange(${i}, ${p})">
-                        <input type="number" class="p${p}-minus r${i} w-full text-center text-sm p-1 bg-red-50 rounded-r outline-none focus:bg-red-100" placeholder="0" oninput="onInputChange(${i}, ${p})">
+                        <input type="number" class="p${p}-plus r${i} w-full text-center text-sm p-1.5 bg-blue-50 rounded-l border-r border-white outline-none focus:bg-blue-100" placeholder="0" oninput="calcTotals()">
+                        <input type="number" class="p${p}-minus r${i} w-full text-center text-sm p-1.5 bg-red-50 rounded-r outline-none focus:bg-red-100" placeholder="0" oninput="calcTotals()">
                     </div>
                 `).join('')}
                 <div class="col-start-2 col-span-4 flex justify-end px-1">
@@ -83,36 +82,37 @@
             scoreRows.appendChild(row);
         }
 
-        // 入力時の処理
-        function onInputChange(rowIdx, pIdx) {
-            calcTotals();
-        }
+        // --- OCR（解析）処理の追加 ---
+        document.getElementById('imageInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const status = document.getElementById('status');
+            status.classList.remove('hidden');
 
-        // 合計0アシスト
-        function assistZero(rowIdx) {
-            const rowScores = [1,2,3,4].map(p => {
-                const plus = parseInt(document.querySelector(`.p${p}-plus.r${rowIdx}`).value) || 0;
-                const minus = parseInt(document.querySelector(`.p${p}-minus.r${rowIdx}`).value) || 0;
-                return plus - minus;
-            });
-            const filledCount = rowScores.filter(s => s !== 0).length;
-            const currentSum = rowScores.reduce((a, b) => a + b, 0);
-            
-            if (currentSum === 0) return;
+            try {
+                // Tesseractで画像内の全テキストを認識
+                const { data: { text } } = await Tesseract.recognize(file, 'eng');
+                // 数字（1〜3桁程度）だけを取り出す
+                const numbers = text.match(/\d+/g)?.map(Number) || [];
+                
+                // 全入力欄（プラスとマイナスが交互に並ぶ）を取得
+                const allInputs = document.querySelectorAll('#scoreRows input');
+                
+                // 読み取った順に流し込む
+                numbers.forEach((num, index) => {
+                    if (index < allInputs.length) {
+                        allInputs[index].value = num;
+                    }
+                });
 
-            // 未入力の1人を探す
-            for(let p=1; p<=4; p++) {
-                const pVal = parseInt(document.querySelector(`.p${p}-plus.r${rowIdx}`).value) || 
-                             parseInt(document.querySelector(`.p${p}-minus.r${rowIdx}`).value) || 0;
-                if (pVal === 0) {
-                    const diff = -currentSum;
-                    if (diff > 0) document.querySelector(`.p${p}-plus.r${rowIdx}`).value = diff;
-                    else document.querySelector(`.p${p}-minus.r${rowIdx}`).value = Math.abs(diff);
-                    break;
-                }
+                status.innerText = "解析完了！";
+                setTimeout(() => status.classList.add('hidden'), 3000);
+                calcTotals();
+            } catch (err) {
+                alert("解析中にエラーが発生しました");
+                status.classList.add('hidden');
             }
-            calcTotals();
-        }
+        });
 
         function calcTotals() {
             [1,2,3,4].forEach(p => {
@@ -128,6 +128,28 @@
             });
         }
 
+        function assistZero(rowIdx) {
+            const rowScores = [1,2,3,4].map(p => {
+                const plus = parseInt(document.querySelector(`.p${p}-plus.r${rowIdx}`).value) || 0;
+                const minus = parseInt(document.querySelector(`.p${p}-minus.r${rowIdx}`).value) || 0;
+                return plus - minus;
+            });
+            const currentSum = rowScores.reduce((a, b) => a + b, 0);
+            if (currentSum === 0) return;
+
+            for(let p=1; p<=4; p++) {
+                const plusVal = document.querySelector(`.p${p}-plus.r${rowIdx}`).value;
+                const minusVal = document.querySelector(`.p${p}-minus.r${rowIdx}`).value;
+                if (!plusVal && !minusVal) {
+                    const diff = -currentSum;
+                    if (diff > 0) document.querySelector(`.p${p}-plus.r${rowIdx}`).value = diff;
+                    else document.querySelector(`.p${p}-minus.r${rowIdx}`).value = Math.abs(diff);
+                    break;
+                }
+            }
+            calcTotals();
+        }
+
         async function saveSheet() {
             const token = prompt("GitHubトークン"); if (!token) return;
             const data = [];
@@ -140,8 +162,6 @@
                 if (row.some(v => v !== 0)) data.push(row);
             }
             const newSheet = { id: Date.now(), date: new Date().toLocaleString('ja-JP'), name: document.getElementById('setName').value || "無題", data };
-            
-            // ... (保存処理は以前と同じ)
             try {
                 const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, { headers: { "Authorization": `token ${token}` } });
                 const fData = await res.json();
@@ -164,7 +184,8 @@
                 const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`);
                 const fData = await res.json();
                 const data = JSON.parse(decodeURIComponent(escape(atob(fData.content))));
-                list.innerHTML = data.reverse().map(s => `<div class="bg-white p-3 rounded shadow-sm text-xs"><b>${s.name}</b> (${s.date})</div>`).join('');
+                list.innerHTML = `<h2 class="text-xs font-bold text-gray-500 mb-2">最近の履歴</h2>` + 
+                    data.reverse().slice(0, 5).map(s => `<div class="bg-white p-2 rounded shadow-sm text-[10px] border-l-2 border-green-600"><b>${s.name}</b> <span class="text-gray-400">(${s.date})</span></div>`).join('');
             } catch(e) {}
         };
     </script>

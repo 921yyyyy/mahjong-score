@@ -63,15 +63,9 @@
             status.classList.remove('hidden');
             status.innerText = "文字を読み取っています...";
 
-            // Tesseract.jsによる解析
-            const { data: { text } } = await Tesseract.recognize(file, 'eng', {
-                logger: m => console.log(m)
-            });
-
-            // 数字だけを抽出して配列にする
+            const { data: { text } } = await Tesseract.recognize(file, 'eng');
             const numbers = text.match(/-?\d+/g)?.map(Number) || [];
             
-            // 読み取った数字を上位4つまで自動入力
             if (numbers.length >= 4) {
                 document.getElementById('p1').value = numbers[0];
                 document.getElementById('p2').value = numbers[1];
@@ -83,7 +77,6 @@
             status.innerText = "解析完了！数値を修正してください。";
         });
 
-        // 合計点計算
         function updateTotal() {
             const scores = Array.from(document.querySelectorAll('.score-input')).map(input => parseInt(input.value) || 0);
             const total = scores.reduce((a, b) => a + b, 0);
@@ -96,8 +89,64 @@
             input.addEventListener('input', updateTotal);
         });
 
-        function saveData() {
-            alert("ここにGitHub API連携やJSON保存の処理を実装します。");
+        // ★修正ポイント: saveData関数
+        async function saveData() {
+            const token = prompt("GitHubトークン(ghp_...)を入力してください");
+            if (!token) return;
+
+            const repo = "921yyyyy/mahjong-score"; // リポジトリ名を確認してください
+            const path = "data.json";
+            
+            const scores = Array.from(document.querySelectorAll('.score-input')).map(input => parseInt(input.value) || 0);
+            const newData = {
+                date: new Date().toLocaleString('ja-JP'),
+                scores: scores
+            };
+
+            const status = document.getElementById('status');
+            status.classList.remove('hidden');
+            status.innerText = "GitHubへ保存中...";
+
+            try {
+                // 1. 現在の data.json を取得
+                const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+                    headers: { "Authorization": `token ${token}` }
+                });
+                
+                if (!res.ok) throw new Error("ファイルの取得に失敗しました。トークンやリポジトリ名を確認してください。");
+                
+                const fileData = await res.json();
+                let content = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
+
+                // 2. データを追加
+                content.push(newData);
+
+                // 3. GitHubへ書き戻し
+                const updateRes = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+                    method: "PUT",
+                    headers: {
+                        "Authorization": `token ${token}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        message: "Score updated via OCR app",
+                        content: btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2)))),
+                        sha: fileData.sha
+                    })
+                });
+
+                if (updateRes.ok) {
+                    alert("成功！data.json に記録されました。");
+                } else {
+                    const errorMsg = await updateRes.json();
+                    throw new Error(errorMsg.message);
+                }
+            } catch (error) {
+                console.error(error);
+                alert("エラー: " + error.message);
+            } finally {
+                status.classList.add('hidden');
+            }
         }
     </script>
 </body>

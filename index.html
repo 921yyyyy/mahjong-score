@@ -7,9 +7,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src='https://unpkg.com/tesseract.js@v4.0.1/dist/tesseract.min.js'></script>
 </head>
-<body class="bg-gray-100 p-4">
+<body class="bg-gray-100 p-4 pb-20">
 
-    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6">
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6 mb-6">
         <h1 class="text-2xl font-bold text-center mb-6 text-green-700">🀄 麻雀スコアOCR</h1>
         
         <div class="mb-6">
@@ -18,26 +18,14 @@
                    class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
         </div>
 
-        <div id="status" class="text-sm text-blue-600 mb-4 hidden text-center italic">解析中...</div>
+        <div id="status" class="text-sm text-blue-600 mb-4 hidden text-center italic">処理中...</div>
 
         <div id="resultArea" class="space-y-4">
             <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="text-xs text-gray-500">Player A</label>
-                    <input type="number" id="p1" class="score-input w-full border rounded p-2 text-center" value="0">
-                </div>
-                <div>
-                    <label class="text-xs text-gray-500">Player B</label>
-                    <input type="number" id="p2" class="score-input w-full border rounded p-2 text-center" value="0">
-                </div>
-                <div>
-                    <label class="text-xs text-gray-500">Player C</label>
-                    <input type="number" id="p3" class="score-input w-full border rounded p-2 text-center" value="0">
-                </div>
-                <div>
-                    <label class="text-xs text-gray-500">Player D</label>
-                    <input type="number" id="p4" class="score-input w-full border rounded p-2 text-center" value="0">
-                </div>
+                <div><label class="text-xs text-gray-500">Player A</label><input type="number" id="p1" class="score-input w-full border rounded p-2 text-center" value="0"></div>
+                <div><label class="text-xs text-gray-500">Player B</label><input type="number" id="p2" class="score-input w-full border rounded p-2 text-center" value="0"></div>
+                <div><label class="text-xs text-gray-500">Player C</label><input type="number" id="p3" class="score-input w-full border rounded p-2 text-center" value="0"></div>
+                <div><label class="text-xs text-gray-500">Player D</label><input type="number" id="p4" class="score-input w-full border rounded p-2 text-center" value="0"></div>
             </div>
 
             <div class="border-t pt-4">
@@ -45,36 +33,41 @@
                 <p class="text-xs text-gray-400">※合計が0になるように調整してください</p>
             </div>
 
-            <button onclick="saveData()" class="w-full bg-green-600 text-white font-bold py-2 rounded-lg hover:bg-green-700 transition">
+            <button onclick="saveData()" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 shadow-lg transition">
                 GitHubへ保存（記録）
             </button>
+        </div>
+    </div>
+
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold text-gray-800">📅 過去の記録</h2>
+            <button onclick="loadHistory()" class="text-xs bg-blue-50 text-blue-600 py-1 px-3 rounded-full hover:bg-blue-100">再読み込み</button>
+        </div>
+        <div id="historyArea" class="space-y-3">
+            <p class="text-xs text-center text-gray-400 italic">読み込みボタンを押してください</p>
         </div>
     </div>
 
     <script>
         const imageInput = document.getElementById('imageInput');
         const status = document.getElementById('status');
+        const repo = "921yyyyy/mahjong-score"; // ここをご自身のリポジトリ名に変更
+        const path = "data.json";
 
         // OCR処理
         imageInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-
             status.classList.remove('hidden');
             status.innerText = "文字を読み取っています...";
-
             const { data: { text } } = await Tesseract.recognize(file, 'eng');
             const numbers = text.match(/-?\d+/g)?.map(Number) || [];
-            
             if (numbers.length >= 4) {
-                document.getElementById('p1').value = numbers[0];
-                document.getElementById('p2').value = numbers[1];
-                document.getElementById('p3').value = numbers[2];
-                document.getElementById('p4').value = numbers[3];
+                ['p1','p2','p3','p4'].forEach((id, i) => document.getElementById(id).value = numbers[i]);
             }
-            
             updateTotal();
-            status.innerText = "解析完了！数値を修正してください。";
+            status.innerText = "解析完了！修正して保存してください。";
         });
 
         function updateTotal() {
@@ -85,69 +78,69 @@
             checkEl.className = total === 0 ? "text-green-600 font-bold" : "text-red-500 font-bold";
         }
 
-        document.querySelectorAll('.score-input').forEach(input => {
-            input.addEventListener('input', updateTotal);
-        });
+        document.querySelectorAll('.score-input').forEach(input => input.addEventListener('input', updateTotal));
 
-        // ★修正ポイント: saveData関数
+        // 保存機能
         async function saveData() {
-            const token = prompt("GitHubトークン(ghp_...)を入力してください");
+            const token = prompt("GitHubトークンを入力してください");
             if (!token) return;
-
-            const repo = "921yyyyy/mahjong-score"; // リポジトリ名を確認してください
-            const path = "data.json";
-            
             const scores = Array.from(document.querySelectorAll('.score-input')).map(input => parseInt(input.value) || 0);
-            const newData = {
-                date: new Date().toLocaleString('ja-JP'),
-                scores: scores
-            };
-
-            const status = document.getElementById('status');
-            status.classList.remove('hidden');
-            status.innerText = "GitHubへ保存中...";
+            const newData = { date: new Date().toLocaleString('ja-JP'), scores: scores };
+            status.classList.remove('hidden'); status.innerText = "保存中...";
 
             try {
-                // 1. 現在の data.json を取得
                 const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
                     headers: { "Authorization": `token ${token}` }
                 });
-                
-                if (!res.ok) throw new Error("ファイルの取得に失敗しました。トークンやリポジトリ名を確認してください。");
-                
                 const fileData = await res.json();
                 let content = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
-
-                // 2. データを追加
                 content.push(newData);
-
-                // 3. GitHubへ書き戻し
                 const updateRes = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
                     method: "PUT",
-                    headers: {
-                        "Authorization": `token ${token}`,
-                        "Content-Type": "application/json"
-                    },
+                    headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        message: "Score updated via OCR app",
+                        message: "Add score",
                         content: btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2)))),
                         sha: fileData.sha
                     })
                 });
-
-                if (updateRes.ok) {
-                    alert("成功！data.json に記録されました。");
-                } else {
-                    const errorMsg = await updateRes.json();
-                    throw new Error(errorMsg.message);
-                }
-            } catch (error) {
-                console.error(error);
-                alert("エラー: " + error.message);
-            } finally {
-                status.classList.add('hidden');
-            }
+                if (updateRes.ok) { alert("保存成功！"); loadHistory(); }
+            } catch (e) { alert("エラー: " + e.message); }
+            status.classList.add('hidden');
         }
+
+        // 履歴読み込み
+        async function loadHistory() {
+            const historyArea = document.getElementById('historyArea');
+            historyArea.innerHTML = "読み込み中...";
+            try {
+                // GitHub Pagesの反映を待たずに最新を取得するため、API経由で取得
+                const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`);
+                const fileData = await res.json();
+                const data = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
+                
+                if (data.length === 0) {
+                    historyArea.innerHTML = "<p class='text-sm text-center text-gray-500'>記録がまだありません</p>";
+                    return;
+                }
+
+                historyArea.innerHTML = data.reverse().map(item => `
+                    <div class="bg-gray-50 p-3 rounded-lg border-l-4 border-green-500 shadow-sm">
+                        <div class="text-[10px] font-bold text-gray-400 mb-1">${item.date}</div>
+                        <div class="grid grid-cols-4 gap-1 text-center">
+                            ${item.scores.map(s => `
+                                <div class="text-sm font-bold ${s >= 0 ? 'text-blue-600' : 'text-red-500'}">
+                                    ${s > 0 ? '+' + s : s}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) { historyArea.innerHTML = "読み込みエラー"; }
+        }
+        
+        // 初回読み込み
+        window.onload = loadHistory;
     </script>
 </body>
 </html>

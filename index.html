@@ -15,21 +15,32 @@
             <div class="space-y-3">
                 <input type="file" id="imageInput" accept="image/*" class="text-xs w-full bg-green-700 p-2 rounded">
                 <div class="flex gap-2">
-                    <button onclick="rotateImage()" class="flex-1 bg-blue-600 py-2 rounded text-xs font-bold">↻ 90度回転</button>
-                    <button onclick="startAnalysis()" id="analyzeBtn" class="flex-1 bg-yellow-500 py-2 rounded text-xs text-black font-bold">🎯 解析開始</button>
+                    <button onclick="rotateImage()" class="flex-1 bg-blue-600 py-2 rounded text-xs font-bold shadow-md active:bg-blue-800">↻ 90度回転</button>
+                    <button onclick="startAnalysis()" id="analyzeBtn" class="flex-1 bg-yellow-500 py-2 rounded text-xs text-black font-bold shadow-md active:bg-yellow-600">🎯 解析開始</button>
                 </div>
             </div>
-            <div class="mt-3 flex justify-center bg-black rounded overflow-hidden relative">
+            <div class="mt-3 flex justify-center bg-black rounded overflow-hidden relative border-2 border-green-900">
                 <canvas id="previewCanvas" class="max-w-full h-auto"></canvas>
             </div>
+            <div id="status" class="text-[10px] text-yellow-200 mt-2 hidden italic text-center">AI解析中... しばらくお待ちください</div>
         </div>
 
-        <div id="scoreGridHeader" class="sticky top-0 z-10"></div>
-        <div id="scoreRows" class="p-1 space-y-1"></div>
+        <div class="score-grid bg-gray-200 p-1 border-b sticky top-0 z-10 text-[10px] font-bold text-center">
+            <div>回</div>
+            <div class="player-col"><div>A+</div><div>A-</div></div>
+            <div class="player-col"><div>B+</div><div>B-</div></div>
+            <div class="player-col"><div>C+</div><div>C-</div></div>
+            <div class="player-col"><div>D+</div><div>D-</div></div>
+        </div>
 
-        <div class="p-4 bg-yellow-50 border-t sticky bottom-0 z-20">
-            <div id="totals" class="grid grid-cols-4 gap-2 mb-4 text-center font-bold font-mono"></div>
-            <button onclick="saveSheet()" class="w-full bg-green-700 text-white py-3 rounded-xl font-bold">データを保存</button>
+        <div id="scoreRows" class="p-1 space-y-1 bg-white min-h-[300px]"></div>
+
+        <div class="p-4 bg-yellow-50 border-t sticky bottom-0 z-20 shadow-inner">
+            <div id="totals" class="score-grid mb-4 text-center font-bold font-mono text-sm">
+                <div class="italic text-gray-400">計</div>
+                <div id="totalA">0</div><div id="totalB">0</div><div id="totalC">0</div><div id="totalD">0</div>
+            </div>
+            <button onclick="saveSheet()" class="w-full bg-green-700 text-white py-4 rounded-2xl font-bold shadow-lg active:scale-95 transition-transform">データを保存</button>
         </div>
     </div>
     <script src="app.js"></script>

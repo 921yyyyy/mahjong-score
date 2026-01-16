@@ -1,0 +1,9 @@
+.score-grid { 
+    display: grid;
+    grid-template-columns: 2.5rem repeat(4, 1fr); 
+    gap: 2px;
+}
+.player-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; }
+input { border-radius: 4px; outline: none; }
+input:focus { background-color: #fefcbf !important; }
+#previewCanvas { transition: transform 0.3s ease; }

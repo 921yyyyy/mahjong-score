@@ -3,90 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>麻雀DXスコア管理</title>
+    <title>麻雀シートDX</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src='https://unpkg.com/tesseract.js@v4.0.1/dist/tesseract.min.js'></script>
+    <style>
+        .score-grid { grid-template-columns: 3rem 1fr 1fr 1fr 1fr; }
+    </style>
 </head>
-<body class="bg-gray-100 p-4 pb-20">
+<body class="bg-gray-100 p-2 pb-20">
 
-    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6 mb-6">
-        <h1 class="text-2xl font-bold text-center mb-6 text-green-700">🀄 麻雀スコアOCR</h1>
-        
-        <div class="mb-6">
-            <label class="block text-sm font-medium text-gray-700 mb-2">記録用紙を撮影</label>
-            <input type="file" id="imageInput" accept="image/*" capture="environment" 
-                   class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+    <div class="max-w-2xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden">
+        <div class="bg-green-700 p-4 text-white flex justify-between items-center">
+            <h1 class="text-xl font-bold">🀄 スコア記録帳</h1>
+            <input type="text" id="setName" placeholder="セット名（例：1/16 友人宅）" class="bg-green-800 text-sm border-none rounded px-2 py-1 text-white placeholder-green-300">
         </div>
 
-        <div id="status" class="text-sm text-blue-600 mb-4 hidden text-center italic">処理中...</div>
+        <div class="p-4 border-b bg-green-50">
+            <label class="block text-xs font-bold text-green-700 mb-1">📷 シートを丸ごとスキャン</label>
+            <input type="file" id="imageInput" accept="image/*" capture="environment" class="w-full text-xs">
+            <div id="status" class="text-[10px] text-blue-600 mt-1 hidden">解析中...</div>
+        </div>
 
-        <div id="resultArea" class="space-y-4">
-            <div class="grid grid-cols-2 gap-4">
-                <div><label class="text-xs text-gray-500">Player A</label><input type="number" id="p1" class="score-input w-full border rounded p-2 text-center" value="0"></div>
-                <div><label class="text-xs text-gray-500">Player B</label><input type="number" id="p2" class="score-input w-full border rounded p-2 text-center" value="0"></div>
-                <div><label class="text-xs text-gray-500">Player C</label><input type="number" id="p3" class="score-input w-full border rounded p-2 text-center" value="0"></div>
-                <div><label class="text-xs text-gray-500">Player D</label><input type="number" id="p4" class="score-input w-full border rounded p-2 text-center" value="0"></div>
+        <div class="p-2 overflow-x-auto">
+            <div class="score-grid grid gap-1 text-center font-bold text-xs border-b pb-2 mb-2 bg-gray-100 p-1">
+                <div>回</div><div>A</div><div>B</div><div>C</div><div>D</div>
             </div>
+            <div id="scoreRows" class="space-y-1">
+                </div>
+        </div>
 
-            <div class="border-t pt-4">
-                <p class="text-sm font-bold">合計点チェック: <span id="totalCheck" class="text-red-500">0</span></p>
-                <p class="text-xs text-gray-400">※合計が0になるように調整してください</p>
-            </div>
-
-            <button onclick="saveData()" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 shadow-lg transition">
-                GitHubへ保存（記録）
-            </button>
+        <div class="p-4 bg-gray-50 border-t flex justify-between items-center">
+            <div class="text-sm font-bold">合計: <span id="boardTotal">0</span></div>
+            <button onclick="saveSheet()" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold shadow-md">GitHubにシートを保存</button>
         </div>
     </div>
 
-    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md p-6">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-lg font-bold text-gray-800">📅 過去の記録</h2>
-            <button onclick="loadHistory()" class="text-xs bg-blue-50 text-blue-600 py-1 px-3 rounded-full hover:bg-blue-100">再読み込み</button>
-        </div>
-        <div id="historyArea" class="space-y-3">
-            <p class="text-xs text-center text-gray-400 italic">読み込みボタンを押してください</p>
-        </div>
-    </div>
+    <div id="historyArea" class="max-w-2xl mx-auto mt-6 space-y-4"></div>
 
     <script>
-        const imageInput = document.getElementById('imageInput');
-        const status = document.getElementById('status');
-        const repo = "921yyyyy/mahjong-score"; // ここをご自身のリポジトリ名に変更
+        const repo = "921yyyyy/mahjong-score";
         const path = "data.json";
 
-        // OCR処理
-        imageInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            status.classList.remove('hidden');
-            status.innerText = "文字を読み取っています...";
-            const { data: { text } } = await Tesseract.recognize(file, 'eng');
-            const numbers = text.match(/-?\d+/g)?.map(Number) || [];
-            if (numbers.length >= 4) {
-                ['p1','p2','p3','p4'].forEach((id, i) => document.getElementById(id).value = numbers[i]);
-            }
-            updateTotal();
-            status.innerText = "解析完了！修正して保存してください。";
-        });
-
-        function updateTotal() {
-            const scores = Array.from(document.querySelectorAll('.score-input')).map(input => parseInt(input.value) || 0);
-            const total = scores.reduce((a, b) => a + b, 0);
-            const checkEl = document.getElementById('totalCheck');
-            checkEl.innerText = total;
-            checkEl.className = total === 0 ? "text-green-600 font-bold" : "text-red-500 font-bold";
+        // 8行の入力欄を生成
+        const scoreRows = document.getElementById('scoreRows');
+        for (let i = 1; i <= 8; i++) {
+            const row = document.createElement('div');
+            row.className = 'score-grid grid gap-1';
+            row.innerHTML = `
+                <div class="flex items-center justify-center text-xs bg-gray-200 rounded">${i}</div>
+                <input type="number" class="p1 r${i} w-full border text-center text-sm p-1 rounded">
+                <input type="number" class="p2 r${i} w-full border text-center text-sm p-1 rounded">
+                <input type="number" class="p3 r${i} w-full border text-center text-sm p-1 rounded">
+                <input type="number" class="p4 r${i} w-full border text-center text-sm p-1 rounded">
+            `;
+            scoreRows.appendChild(row);
         }
 
-        document.querySelectorAll('.score-input').forEach(input => input.addEventListener('input', updateTotal));
+        // OCR一括反映ロジック
+        document.getElementById('imageInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const status = document.getElementById('status');
+            status.classList.remove('hidden'); status.innerText = "シート全体を解析中...";
 
-        // 保存機能
-        async function saveData() {
-            const token = prompt("GitHubトークンを入力してください");
+            const { data: { text } } = await Tesseract.recognize(file, 'eng');
+            const numbers = text.match(/-?\d+/g)?.map(Number) || [];
+            
+            // 読み取った数字を上から順に全てのセルに流し込む（理想への第一歩）
+            const allInputs = document.querySelectorAll('#scoreRows input');
+            numbers.forEach((num, index) => {
+                if (index < allInputs.length) allInputs[index].value = num;
+            });
+
+            status.innerText = "スキャン完了。誤字を修正してください。";
+        });
+
+        async function saveSheet() {
+            const token = prompt("GitHubトークンを入力");
             if (!token) return;
-            const scores = Array.from(document.querySelectorAll('.score-input')).map(input => parseInt(input.value) || 0);
-            const newData = { date: new Date().toLocaleString('ja-JP'), scores: scores };
-            status.classList.remove('hidden'); status.innerText = "保存中...";
+
+            const setName = document.getElementById('setName').value || new Date().toLocaleDateString();
+            const rows = [];
+            for (let i = 1; i <= 8; i++) {
+                const vals = Array.from(document.querySelectorAll(`.r${i}`)).map(el => parseInt(el.value) || 0);
+                if (vals.some(v => v !== 0)) rows.push(vals);
+            }
+
+            const newSheet = { date: new Date().toLocaleString(), name: setName, data: rows };
 
             try {
                 const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
@@ -94,52 +97,42 @@
                 });
                 const fileData = await res.json();
                 let content = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
-                content.push(newData);
-                const updateRes = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+                content.push(newSheet);
+
+                await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
                     method: "PUT",
                     headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        message: "Add score",
+                        message: "Add full sheet",
                         content: btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2)))),
                         sha: fileData.sha
                     })
                 });
-                if (updateRes.ok) { alert("保存成功！"); loadHistory(); }
+                alert("シートを保存しました！");
+                location.reload();
             } catch (e) { alert("エラー: " + e.message); }
-            status.classList.add('hidden');
         }
 
-        // 履歴読み込み
         async function loadHistory() {
             const historyArea = document.getElementById('historyArea');
-            historyArea.innerHTML = "読み込み中...";
             try {
-                // GitHub Pagesの反映を待たずに最新を取得するため、API経由で取得
                 const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`);
                 const fileData = await res.json();
                 const data = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
-                
-                if (data.length === 0) {
-                    historyArea.innerHTML = "<p class='text-sm text-center text-gray-500'>記録がまだありません</p>";
-                    return;
-                }
 
-                historyArea.innerHTML = data.reverse().map(item => `
-                    <div class="bg-gray-50 p-3 rounded-lg border-l-4 border-green-500 shadow-sm">
-                        <div class="text-[10px] font-bold text-gray-400 mb-1">${item.date}</div>
-                        <div class="grid grid-cols-4 gap-1 text-center">
-                            ${item.scores.map(s => `
-                                <div class="text-sm font-bold ${s >= 0 ? 'text-blue-600' : 'text-red-500'}">
-                                    ${s > 0 ? '+' + s : s}
-                                </div>
+                historyArea.innerHTML = data.reverse().map(sheet => `
+                    <div class="bg-white shadow rounded-lg p-4">
+                        <div class="text-sm font-bold border-b pb-2 mb-2 text-green-800">${sheet.name} (${sheet.date})</div>
+                        <table class="w-full text-xs text-center">
+                            <tr class="bg-gray-100"><th>回</th><th>A</th><th>B</th><th>C</th><th>D</th></tr>
+                            ${sheet.data.map((row, i) => `
+                                <tr><td>${i+1}</td>${row.map(s => `<td>${s}</td>`).join('')}</tr>
                             `).join('')}
-                        </div>
+                        </table>
                     </div>
                 `).join('');
-            } catch (e) { historyArea.innerHTML = "読み込みエラー"; }
+            } catch (e) { console.log(e); }
         }
-        
-        // 初回読み込み
         window.onload = loadHistory;
     </script>
 </body>

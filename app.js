@@ -2,7 +2,7 @@ const canvas = document.getElementById('previewCanvas');
 const ctx = canvas.getContext('2d');
 let currentImage = null;
 let rotation = 0;
-let gridConfig = { ox: 0, oy: 0, uw: 0, uh: 0 }; // 自動計算される座標
+let gridConfig = { ox: 0, oy: 0, uw: 0, uh: 0 };
 
 // 1. 画像読み込み
 document.getElementById('imageInput').addEventListener('change', (e) => {
@@ -14,6 +14,7 @@ document.getElementById('imageInput').addEventListener('change', (e) => {
         img.onload = () => {
             currentImage = img;
             rotation = 0;
+            gridConfig = { ox: 0, oy: 0, uw: 0, uh: 0 }; // リセット
             drawPreview();
         };
         img.src = event.target.result;
@@ -37,6 +38,7 @@ function drawPreview() {
     ctx.rotate((rotation * Math.PI) / 180);
     ctx.drawImage(currentImage, -currentImage.width / 2, -currentImage.height / 2);
     ctx.restore();
+
     if (gridConfig.uw > 0) drawGuide();
 }
 
@@ -46,47 +48,54 @@ function drawGuide() {
     ctx.strokeRect(gridConfig.ox, gridConfig.oy, gridConfig.uw, gridConfig.uh);
 }
 
-// 2. 🎯 自動キャリブレーション ＋ 解析エンジン
+// 2. 🎯 高速自動検知 ＋ 解析エンジン
 async function startAnalysis() {
     if (!currentImage) return alert("画像を選んでください");
     const btn = document.getElementById('analyzeBtn');
     btn.innerText = "位置を特定中...";
     btn.disabled = true;
 
-    // STEP 1: アンカー（目印）の自動検知
-    // 表の左側にある「1」と「8」を探して、表の正確な高さを割り出す
+    // --- STEP 1: 高速アンカーサーチ (限定エリアスキャン) ---
     const worker = await Tesseract.createWorker('eng');
-    const { data } = await worker.recognize(canvas);
     
-    let firstRowY = null;
-    let lastRowY = null;
-    let tableLeftX = null;
+    // 左端の25%・上端の40%だけを切り出した一時的なキャンバスを作成
+    const scanCanvas = document.createElement('canvas');
+    scanCanvas.width = canvas.width * 0.25;
+    scanCanvas.height = canvas.height * 0.4;
+    const sCtx = scanCanvas.getContext('2d');
+    sCtx.drawImage(canvas, 0, 0, canvas.width * 0.25, canvas.height * 0.4, 0, 0, scanCanvas.width, scanCanvas.height);
 
-    data.words.forEach(w => {
-        const txt = w.text.trim();
-        if (txt === "1") { firstRowY = w.bbox.y0; tableLeftX = w.bbox.x1; }
-        if (txt === "8") { lastRowY = w.bbox.y0; }
+    // 「1」という文字だけを狙い撃ちで探す設定
+    await worker.setParameters({
+        tessedit_char_whitelist: '1',
+        tessedit_pageseg_mode: '11' // SPARSE_TEXT
     });
 
-    // アンカーが見つからない場合のフォールバック（手動設定に近い値）
-    if (!firstRowY || !lastRowY) {
-        console.log("アンカー検知失敗。標準設定を使用します。");
-        gridConfig.ox = canvas.width * 0.18;
-        gridConfig.oy = canvas.height * 0.12;
-        gridConfig.uw = canvas.width * 0.76;
-        gridConfig.uh = canvas.height * 0.72;
+    const { data } = await worker.recognize(scanCanvas);
+    const firstOne = data.words.find(w => w.text.includes("1"));
+
+    if (firstOne) {
+        // 目印が見つかったら、そこを起点にグリッドを自動計算
+        gridConfig.ox = firstOne.bbox.x1 + (canvas.width * 0.02);
+        gridConfig.oy = firstOne.bbox.y0;
+        gridConfig.uw = canvas.width * 0.92 - gridConfig.ox;
+        gridConfig.uh = canvas.height * 0.88 - gridConfig.oy;
+        drawPreview(); // 赤枠を表示
     } else {
-        // アンカーに基づきグリッドを自動構成
-        gridConfig.ox = tableLeftX + (canvas.width * 0.02); // 「1」の右側から開始
-        gridConfig.oy = firstRowY;
-        gridConfig.uw = canvas.width * 0.95 - gridConfig.ox; // 右端まで
-        gridConfig.uh = (lastRowY - firstRowY) * 1.15; // 8行分をカバー
+        // 見つからない場合は標準比率を使用
+        gridConfig = {
+            ox: canvas.width * 0.15,
+            oy: canvas.height * 0.12,
+            uw: canvas.width * 0.8,
+            uh: canvas.height * 0.75
+        };
+        console.log("アンカー未検出。標準設定を適用。");
     }
 
-    drawPreview(); // 赤枠を更新表示
-    btn.innerText = "各マスを精査中...";
+    // --- STEP 2: 各マスの詳細解析 (Workerを使い回し) ---
+    btn.innerText = "データ解析中...";
+    await worker.setParameters({ tessedit_char_whitelist: '0123456789' });
 
-    // STEP 2: グリッド分割解析
     const rows = 8;
     const cols = 8;
     const cellW = gridConfig.uw / cols;
@@ -95,28 +104,20 @@ async function startAnalysis() {
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
             const cellCanvas = document.createElement('canvas');
-            cellCanvas.width = 120; cellCanvas.height = 120;
+            cellCanvas.width = 100; cellCanvas.height = 100;
             const cCtx = cellCanvas.getContext('2d');
+            cCtx.drawImage(canvas, gridConfig.ox + (c * cellW), gridConfig.oy + (r * cellH), cellW, cellH, 0, 0, 100, 100);
 
-            // 切り出し座標
-            const sx = gridConfig.ox + (c * cellW);
-            const sy = gridConfig.oy + (r * cellH);
-            cCtx.drawImage(canvas, sx, sy, cellW, cellH, 0, 0, 120, 120);
-
-            // 画像処理（二値化：白黒をはっきりさせて認識率UP）
-            const imgData = cCtx.getImageData(0, 0, 120, 120);
+            // 二値化処理
+            const imgData = cCtx.getImageData(0, 0, 100, 100);
             for (let i = 0; i < imgData.data.length; i += 4) {
-                const brightness = (imgData.data[i] + imgData.data[i+1] + imgData.data[i+2]) / 3;
-                const v = brightness > 150 ? 255 : 0;
+                const avg = (imgData.data[i] + imgData.data[i+1] + imgData.data[i+2]) / 3;
+                const v = avg > 145 ? 255 : 0;
                 imgData.data[i] = imgData.data[i+1] = imgData.data[i+2] = v;
             }
             cCtx.putImageData(imgData, 0, 0);
 
-            // このマスの数字を読み取る
-            const { data: { text } } = await worker.recognize(cellCanvas, {
-                tessedit_char_whitelist: '0123456789'
-            });
-            
+            const { data: { text } } = await worker.recognize(cellCanvas);
             const num = text.replace(/[^0-9]/g, '');
             if (num && num.length <= 3) {
                 const inputs = document.querySelectorAll('#scoreRows input');
@@ -133,7 +134,6 @@ async function startAnalysis() {
     document.getElementById('scoreRows').scrollIntoView({ behavior: 'smooth' });
 }
 
-// 合計計算
 function calcTotals() {
     [1,2,3,4].forEach(p => {
         let pTotal = 0;
@@ -150,7 +150,6 @@ function calcTotals() {
     });
 }
 
-// 画面起動時の入力欄生成
 window.onload = () => {
     const scoreRows = document.getElementById('scoreRows');
     for (let i = 1; i <= 8; i++) {
@@ -158,16 +157,10 @@ window.onload = () => {
         row.className = 'score-grid items-center border-b border-gray-100 pb-1';
         row.innerHTML = `<div class="text-center font-mono text-[10px] text-gray-400">${i}</div>
             ${[1,2,3,4].map(p => `
-                <div class="player-col items-center">
+                <div class="player-col">
                     <input type="number" class="p${p}-plus r${i} w-full text-center text-sm p-2 bg-blue-50 outline-none" placeholder="0" oninput="calcTotals()">
                     <input type="number" class="p${p}-minus r${i} w-full text-center text-sm p-2 bg-red-50 outline-none" placeholder="0" oninput="calcTotals()">
                 </div>`).join('')}`;
         scoreRows.appendChild(row);
     }
 };
-
-// 保存機能（既存のGitHub連携をここに実装）
-async function saveSheet() {
-    const setName = document.getElementById('setName')?.value || "無題のシート";
-    alert(setName + " を保存します（トークン入力が必要です）");
-}

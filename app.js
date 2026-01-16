@@ -47,19 +47,26 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.drawImage(currentImage, -currentImage.width / 2, -currentImage.height / 2);
         ctx.restore();
 
-        if (gridConfig.uw > 0) {
-            // 赤枠の描画
-            ctx.strokeStyle = "rgba(255, 0, 0, 0.8)";
-            ctx.lineWidth = 5;
-            ctx.strokeRect(gridConfig.ox, gridConfig.oy, gridConfig.uw, gridConfig.uh);
-            
-            // 8x8のガイド線
-            ctx.strokeStyle = "rgba(255, 0, 0, 0.2)";
-            ctx.lineWidth = 1;
-            for(let i=1; i<8; i++) {
-                let y = gridConfig.oy + (gridConfig.uh/8)*i;
-                ctx.beginPath(); ctx.moveTo(gridConfig.ox, y); ctx.lineTo(gridConfig.ox+gridConfig.uw, y); ctx.stroke();
-            }
+        if (gridConfig.uw > 0) drawGuide();
+    }
+
+    function drawGuide() {
+        // メインの赤枠
+        ctx.strokeStyle = "rgba(255, 0, 0, 0.8)";
+        ctx.lineWidth = 5;
+        ctx.strokeRect(gridConfig.ox, gridConfig.oy, gridConfig.uw, gridConfig.uh);
+        
+        // 分割ガイド
+        ctx.strokeStyle = "rgba(255, 0, 0, 0.2)";
+        ctx.lineWidth = 1;
+        const rows = 8; const cols = 8;
+        for(let i=1; i<rows; i++) {
+            let y = gridConfig.oy + (gridConfig.uh / rows) * i;
+            ctx.beginPath(); ctx.moveTo(gridConfig.ox, y); ctx.lineTo(gridConfig.ox + gridConfig.uw, y); ctx.stroke();
+        }
+        for(let j=1; j<cols; j++) {
+            let x = gridConfig.ox + (gridConfig.uw / cols) * j;
+            ctx.beginPath(); ctx.moveTo(x, gridConfig.oy); ctx.lineTo(x, gridConfig.oy + gridConfig.uh); ctx.stroke();
         }
     }
 
@@ -68,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
         drawPreview();
     };
 
-    // 3. 🎯 解析エンジン（安定版ベース・三点補正）
+    // 3. 🎯 解析エンジン（10%絞り込み・三点補正）
     document.getElementById('analyzeBtn').onclick = async () => {
         if (!currentImage) return log("エラー: 画像なし");
         log("解析開始...");
@@ -80,32 +87,38 @@ document.addEventListener('DOMContentLoaded', () => {
             await worker.loadLanguage('eng');
             await worker.initialize('eng');
 
-            // 探索範囲を広めに取りつつ生データで検知
-            const { data } = await worker.recognize(canvas);
-            const firstOne = data.words.find(w => w.text.includes("1") && w.bbox.x0 < canvas.width * 0.25);
+            // --- STEP 1: アンカー特定 (横10%に限定) ---
+            const scanCanvas = document.createElement('canvas');
+            scanCanvas.width = canvas.width * 0.10; // 10%に絞り込み
+            scanCanvas.height = canvas.height;
+            const sCtx = scanCanvas.getContext('2d');
+            sCtx.drawImage(canvas, 0, 0, canvas.width * 0.10, canvas.height, 0, 0, scanCanvas.width, scanCanvas.height);
+
+            const { data } = await worker.recognize(scanCanvas);
+            const firstOne = data.words.find(w => w.text.includes("1"));
 
             if (firstOne) {
-                log("'1'を検知。座標を最適化します。");
+                log("'1'を検知。枠を調整します。");
                 const charH = firstOne.bbox.y1 - firstOne.bbox.y0;
 
-                // 【修正1：上端】ヘッダー(氏名・記号)を避けるため、1の文字の40%分下げる
-                gridConfig.oy = firstOne.bbox.y0 + (charH * 0.4);
+                // 【上端】1の高さの半分（0.5）下げて氏名・ヘッダーを除外
+                gridConfig.oy = firstOne.bbox.y0 + (charH * 0.5);
                 
-                // 【修正2：右端】Dさんのマイナス列まで。5人目(右端の余白)を24%カット
+                // 【右端】Dさんマイナス列まで。右側余白を25%カット
                 gridConfig.ox = firstOne.bbox.x1 + 5;
-                gridConfig.uw = (canvas.width - gridConfig.ox) * 0.76;
+                gridConfig.uw = (canvas.width - gridConfig.ox) * 0.75;
 
-                // 【修正3：下端】8回分。合計行の手前の余白で止まるよう係数を調整
-                gridConfig.uh = charH * 16.5; 
+                // 【下端】8回分。合計上の余白行を含まないよう16倍に設定
+                gridConfig.uh = charH * 16.0; 
 
-                log("グリッド確定成功");
+                log("グリッド設定完了");
             } else {
-                log("アンカー失敗。標準比率を適用。");
-                gridConfig = { ox: canvas.width*0.18, oy: canvas.height*0.19, uw: canvas.width*0.7, uh: canvas.height*0.62 };
+                log("アンカー失敗。標準設定適用。");
+                gridConfig = { ox: canvas.width*0.18, oy: canvas.height*0.19, uw: canvas.width*0.72, uh: canvas.height*0.62 };
             }
             drawPreview();
 
-            // --- マス目スキャン ---
+            // --- STEP 2: 8x8スキャン ---
             await worker.setParameters({ tessedit_char_whitelist: '0123456789' });
             const inputs = document.querySelectorAll('#scoreRows input');
             const cellW = gridConfig.uw / 8;
@@ -116,14 +129,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     const cellCanvas = document.createElement('canvas');
                     cellCanvas.width = 64; cellCanvas.height = 64;
                     const cCtx = cellCanvas.getContext('2d');
-                    // マスの中心部を抽出
                     cCtx.drawImage(canvas, gridConfig.ox + (c * cellW), gridConfig.oy + (r * cellH), cellW, cellH, 0, 0, 64, 64);
                     const { data: { text } } = await worker.recognize(cellCanvas);
                     const num = text.replace(/[^0-9]/g, '');
                     if (num) inputs[(r * 8) + c].value = num;
                 }
             }
-            log("✅ 解析完了");
+            log("✅ 全解析完了");
             await worker.terminate();
         } catch (e) {
             log("エラー: " + e.message);
@@ -150,7 +162,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 入力欄生成
     for (let i = 1; i <= 8; i++) {
         const row = document.createElement('div');
         row.className = 'flex items-center border-b border-gray-100 py-1 text-center';
@@ -161,5 +172,4 @@ document.addEventListener('DOMContentLoaded', () => {
         scoreRows.appendChild(row);
     }
     document.querySelectorAll('#scoreRows input').forEach(input => input.addEventListener('input', calcTotals));
-    log("システム準備完了。");
 });

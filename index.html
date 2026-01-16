@@ -3,29 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>麻雀DXスコアラー</title>
+    <title>麻雀DXスコアラー | デバッグモード</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src='https://unpkg.com/tesseract.js@v4.0.1/dist/tesseract.min.js'></script>
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-gray-100 pb-20">
+<body class="bg-gray-100 pb-24">
     <div class="max-w-2xl mx-auto bg-white shadow-xl min-h-screen">
-        <div class="bg-green-800 p-4 text-white">
-            <h1 class="text-lg font-bold mb-3">🀄 高精度グリッド解析モード</h1>
+        <div class="bg-slate-800 p-4 text-white">
+            <h1 class="text-lg font-bold mb-3 flex items-center">
+                <span class="mr-2">🀄</span> 高精度解析 (Debug Ver.)
+            </h1>
             <div class="space-y-3">
-                <input type="file" id="imageInput" accept="image/*" class="text-xs w-full bg-green-700 p-2 rounded">
+                <input type="file" id="imageInput" accept="image/*" class="text-xs w-full bg-slate-700 p-2 rounded">
                 <div class="flex gap-2">
-                    <button onclick="rotateImage()" class="flex-1 bg-blue-600 py-2 rounded text-xs font-bold shadow-md active:bg-blue-800">↻ 90度回転</button>
-                    <button onclick="startAnalysis()" id="analyzeBtn" class="flex-1 bg-yellow-500 py-2 rounded text-xs text-black font-bold shadow-md active:bg-yellow-600">🎯 解析開始</button>
+                    <button onclick="rotateImage()" class="flex-1 bg-blue-600 py-3 rounded-lg text-xs font-bold shadow-md active:bg-blue-800">↻ 回転</button>
+                    <button onclick="startAnalysis()" id="analyzeBtn" class="flex-1 bg-amber-500 py-3 rounded-lg text-xs text-black font-bold shadow-md active:bg-amber-600">🎯 解析開始</button>
                 </div>
             </div>
-            <div class="mt-3 flex justify-center bg-black rounded overflow-hidden relative border-2 border-green-900">
+
+            <div class="mt-4 flex justify-center bg-black rounded overflow-hidden border-2 border-slate-600 relative">
                 <canvas id="previewCanvas" class="max-w-full h-auto"></canvas>
             </div>
-            <div id="status" class="text-[10px] text-yellow-200 mt-2 hidden italic text-center">AI解析中... しばらくお待ちください</div>
+
+            <div id="debugLog" class="mt-3 p-2 bg-black text-green-400 font-mono text-[10px] h-32 overflow-y-auto rounded border border-green-900 leading-relaxed">
+                <div>-- System Ready --</div>
+            </div>
         </div>
 
-        <div class="score-grid bg-gray-200 p-1 border-b sticky top-0 z-10 text-[10px] font-bold text-center">
+        <div class="score-grid bg-slate-200 p-1 border-b sticky top-0 z-10 text-[10px] font-bold text-center">
             <div>回</div>
             <div class="player-col"><div>A+</div><div>A-</div></div>
             <div class="player-col"><div>B+</div><div>B-</div></div>
@@ -33,14 +39,20 @@
             <div class="player-col"><div>D+</div><div>D-</div></div>
         </div>
 
-        <div id="scoreRows" class="p-1 space-y-1 bg-white min-h-[300px]"></div>
-
-        <div class="p-4 bg-yellow-50 border-t sticky bottom-0 z-20 shadow-inner">
-            <div id="totals" class="score-grid mb-4 text-center font-bold font-mono text-sm">
-                <div class="italic text-gray-400">計</div>
-                <div id="totalA">0</div><div id="totalB">0</div><div id="totalC">0</div><div id="totalD">0</div>
+        <div id="scoreRows" class="p-1 space-y-1 bg-white min-h-[200px]">
             </div>
-            <button onclick="saveSheet()" class="w-full bg-green-700 text-white py-4 rounded-2xl font-bold shadow-lg active:scale-95 transition-transform">データを保存</button>
+
+        <div class="p-4 bg-slate-50 border-t fixed bottom-0 left-0 right-0 max-w-2xl mx-auto z-20 shadow-[0_-4px_10px_rgba(0,0,0,0.1)]">
+            <div id="totals" class="score-grid mb-4 text-center font-bold font-mono text-sm items-center">
+                <div class="text-[10px] text-slate-400">合計</div>
+                <div id="totalA" class="text-blue-600">0</div>
+                <div id="totalB" class="text-blue-600">0</div>
+                <div id="totalC" class="text-blue-600">0</div>
+                <div id="totalD" class="text-blue-600">0</div>
+            </div>
+            <button onclick="saveSheet()" class="w-full bg-emerald-700 text-white py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-transform">
+                データを保存
+            </button>
         </div>
     </div>
     <script src="app.js"></script>

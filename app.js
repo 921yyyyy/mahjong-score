@@ -33,13 +33,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function initScoreTable() {
         gridBody.innerHTML = '';
         for (let i = 1; i <= 8; i++) {
-            // 回数セル
             const numCell = document.createElement('div');
             numCell.className = 'cell-num flex items-center justify-center border-b border-slate-100';
             numCell.innerText = i;
             gridBody.appendChild(numCell);
 
-            // A〜Dさんの入力セル
             for(let p = 0; p < 4; p++) {
                 const cell = document.createElement('div');
                 cell.className = 'grid-cell border-b border-slate-100';
@@ -79,7 +77,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentImage = img;
                 rotation = 0;
                 log("画像読み込み成功。赤枠を数字に合わせてください。");
-                // 初期値を設定
                 baseGrid = { ox: img.width * 0.1, oy: img.height * 0.2, uw: img.width * 0.8, uh: img.height * 0.5 };
                 updateAdjustment();
             };
@@ -99,12 +96,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.drawImage(currentImage, -currentImage.width / 2, -currentImage.height / 2);
         ctx.restore();
 
-        // 調整枠
         ctx.strokeStyle = "#f97316";
         ctx.lineWidth = Math.max(5, canvas.width / 120);
         ctx.strokeRect(gridConfig.ox, gridConfig.oy, gridConfig.uw, gridConfig.uh);
         
-        // 8x8 ガイド
         ctx.lineWidth = 2;
         ctx.strokeStyle = "rgba(249, 115, 22, 0.5)";
         for(let i=1; i<8; i++) {
@@ -154,6 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
         calcTotals();
     };
 
+    // --- バリデーション機能付き合計計算 ---
     function calcTotals() {
         const inputs = document.querySelectorAll('#gridBody input');
         const totals = [0, 0, 0, 0];
@@ -164,15 +160,57 @@ document.addEventListener('DOMContentLoaded', () => {
                 totals[p] += (plus - minus);
             }
         }
+
+        const grandTotal = totals.reduce((a, b) => a + b, 0);
+        const saveBtn = document.getElementById('saveData');
+        
+        if (grandTotal === 0) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = `💾 結果を保存 (合計: ${grandTotal} ✅)`;
+            saveBtn.className = "w-full py-5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-xl transition-all active:scale-95";
+        } else {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = `⚠️ 合計を0にしてください (現在: ${grandTotal > 0 ? '+' : ''}${grandTotal})`;
+            saveBtn.className = "w-full py-5 bg-slate-600 text-slate-400 font-black rounded-2xl shadow-xl cursor-not-allowed";
+        }
+
         ['A','B','C','D'].forEach((id, i) => {
             const el = document.getElementById(`total${id}`);
             el.innerText = (totals[i] >= 0 ? '+' : '') + totals[i];
             el.className = `bg-slate-50 py-3 text-center font-black text-sm border-t border-slate-400 ${totals[i] >= 0 ? 'text-indigo-600' : 'text-rose-500'}`;
         });
     }
+
+    // 自動調整の実行関数
+    function runAutoAdjust() {
+        const inputs = document.querySelectorAll('#gridBody input');
+        let currentSum = 0;
+        for(let r = 0; r < 8; r++) {
+            for(let p = 0; p < 4; p++) {
+                if(r === 7 && p === 3) continue; 
+                const plus = parseInt(inputs[(r * 8) + (p * 2)].value) || 0;
+                const minus = parseInt(inputs[(r * 8) + (p * 2) + 1].value) || 0;
+                currentSum += (plus - minus);
+            }
+        }
+        const lastPlusInput = inputs[(7 * 8) + (3 * 2)];
+        const lastMinusInput = inputs[(7 * 8) + (3 * 2) + 1];
+        
+        if (currentSum > 0) {
+            lastPlusInput.value = 0;
+            lastMinusInput.value = currentSum;
+        } else {
+            lastPlusInput.value = Math.abs(currentSum);
+            lastMinusInput.value = 0;
+        }
+        
+        calcTotals();
+        alert("合計が0になるよう自動調整しました。");
+    }
+
     gridBody.addEventListener('input', calcTotals);
-        // --- クラウド保存ロジック（統合版） ---
-    // ライブラリが読み込まれるのを待ってから初期化
+
+    // --- クラウド保存ロジック ---
     const initCloud = () => {
         if (!window.supabase) {
             setTimeout(initCloud, 500);
@@ -180,7 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs'; // 先ほどの長いanonキー
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         const saveBtn = document.getElementById('saveData');
@@ -191,14 +229,21 @@ document.addEventListener('DOMContentLoaded', () => {
         saveBtn.onclick = () => {
             playerInputsArea.innerHTML = '';
             ['A', 'B', 'C', 'D'].forEach(p => {
+                let adjustBtn = (p === 'D') ? `<button id="autoAdjustBtn" class="text-[9px] bg-orange-500 text-white px-2 py-1 rounded-md ml-2">残りを自動入力</button>` : '';
                 playerInputsArea.innerHTML += `
                     <div class="space-y-1">
-                        <label class="text-[10px] text-slate-400 font-bold ml-1">${p}さんの名前</label>
+                        <div class="flex items-center justify-between">
+                            <label class="text-[10px] text-slate-400 font-bold ml-1">${p}さんの名前</label>
+                            ${adjustBtn}
+                        </div>
                         <input type="text" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-white text-sm" 
                                placeholder="名前を入力" list="playerHistory">
                     </div>`;
             });
             modal.style.display = 'flex';
+            
+            const autoBtn = document.getElementById('autoAdjustBtn');
+            if(autoBtn) autoBtn.onclick = runAutoAdjust;
         };
 
         submitBtn.onclick = async () => {
@@ -208,7 +253,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const scoreInputs = document.querySelectorAll('#gridBody input');
             const rawNumbers = Array.from(scoreInputs).map(i => parseInt(i.value) || 0);
             
-            // 合計計算
             const totals = [0, 1, 2, 3].map(p => {
                 let sum = 0;
                 for(let r=0; r<8; r++) sum += (rawNumbers[r*8 + p*2] - rawNumbers[r*8 + p*2 + 1]);

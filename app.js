@@ -171,4 +171,66 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     gridBody.addEventListener('input', calcTotals);
+        // --- クラウド保存ロジック（統合版） ---
+    // ライブラリが読み込まれるのを待ってから初期化
+    const initCloud = () => {
+        if (!window.supabase) {
+            setTimeout(initCloud, 500);
+            return;
+        }
+
+        const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs'; // 先ほどの長いanonキー
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const saveBtn = document.getElementById('saveData');
+        const modal = document.getElementById('cloudModal');
+        const playerInputsArea = document.getElementById('playerInputs');
+        const submitBtn = document.getElementById('dbSubmitBtn');
+
+        saveBtn.onclick = () => {
+            playerInputsArea.innerHTML = '';
+            ['A', 'B', 'C', 'D'].forEach(p => {
+                playerInputsArea.innerHTML += `
+                    <div class="space-y-1">
+                        <label class="text-[10px] text-slate-400 font-bold ml-1">${p}さんの名前</label>
+                        <input type="text" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-white text-sm" 
+                               placeholder="名前を入力" list="playerHistory">
+                    </div>`;
+            });
+            modal.style.display = 'flex';
+        };
+
+        submitBtn.onclick = async () => {
+            submitBtn.disabled = true;
+            submitBtn.innerText = "保存中...";
+            const names = Array.from(playerInputsArea.querySelectorAll('input')).map(i => i.value || '未設定');
+            const scoreInputs = document.querySelectorAll('#gridBody input');
+            const rawNumbers = Array.from(scoreInputs).map(i => parseInt(i.value) || 0);
+            
+            // 合計計算
+            const totals = [0, 1, 2, 3].map(p => {
+                let sum = 0;
+                for(let r=0; r<8; r++) sum += (rawNumbers[r*8 + p*2] - rawNumbers[r*8 + p*2 + 1]);
+                return sum;
+            });
+
+            try {
+                const { error } = await supabase.from('games').insert({
+                    player_names: names,
+                    scores: totals,
+                    raw_data: { grid: rawNumbers }
+                });
+                if (error) throw error;
+                alert("クラウド保存に成功しました！");
+                modal.style.display = 'none';
+            } catch (err) {
+                alert("エラー: " + err.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = "DBに保存";
+            }
+        };
+    };
+    initCloud();
 });

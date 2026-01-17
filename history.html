@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🀄 対局履歴 - MS PRO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-4 bg-slate-900 text-slate-100 pb-24">
+    <div class="max-w-xl mx-auto space-y-6">
+        <header class="flex justify-between items-center">
+            <h1 class="text-xl font-black text-orange-400">PAST GAMES</h1>
+            <a href="index.html" class="text-xs bg-slate-800 px-4 py-2 rounded-full border border-slate-700">← 戻る</a>
+        </header>
+
+        <div id="historyList" class="space-y-4">
+            <div class="text-center py-10 text-slate-500">データを読み込み中...</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="history.js"></script>
+</body>
+</html>

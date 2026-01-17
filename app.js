@@ -180,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // 先ほどの長いanonキー
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs'; // 先ほどの長いanonキー
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         const saveBtn = document.getElementById('saveData');

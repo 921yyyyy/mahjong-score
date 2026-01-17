@@ -283,62 +283,84 @@ const updatePlayerSuggestions = async () => {
     const scoreInputs = document.querySelectorAll('#gridBody input');
     const rawNumbers = Array.from(scoreInputs).map(i => parseInt(i.value) || 0);
 
-    // 1. 各プレイヤーの最終合計スコアを算出
-    const finalScores = [0, 1, 2, 3].map(p => {
-        let sum = 0;
-        for (let r = 0; r < 8; r++) sum += (rawNumbers[r * 8 + p * 2] - rawNumbers[r * 8 + p * 2 + 1]);
-        return sum;
-    });
-
-    // 2. 着順（Rank）を計算する（スコアが高い順）
-    // スコアと元のインデックスをセットにしてソート
-    const sorted = finalScores
-        .map((s, i) => ({ score: s, index: i }))
-        .sort((a, b) => b.score - a.score);
-    
-    const ranks = new Array(4);
-    sorted.forEach((item, i) => {
-        ranks[item.index] = i + 1; // 1位〜4位
-    });
+    // 順位判定関数（案1: 同点時はインデックスが小さい方を優先 / 案2: 同順位を認める）
+    const getRanks = (scores, useTiedRank = false) => {
+        const sorted = scores.map((s, i) => ({ s, i }))
+            .sort((a, b) => b.s !== a.s ? b.s - a.s : a.i - b.i);
+        
+        const ranks = new Array(4);
+        sorted.forEach((item, i) => {
+            if (useTiedRank && i > 0 && item.s === sorted[i - 1].s) {
+                ranks[item.index] = ranks[sorted[i - 1].index];
+            } else {
+                ranks[item.i] = i + 1;
+            }
+        });
+        return ranks;
+    };
 
     try {
-        // --- 手順A: プレイヤー名簿の更新（前回同様） ---
+        // 1. プレイヤー名簿の更新
         const newPlayers = names.filter(n => n !== '未設定').map(n => ({ name: n }));
         if (newPlayers.length > 0) {
             await supabase.from('players').upsert(newPlayers, { onConflict: 'name' });
         }
-        
-        // 最新のplayer_idを取得するためにplayersテーブルを再参照
         const { data: playerData } = await supabase.from('players').select('id, name').in('name', names);
 
-        // --- 手順B: gamesテーブルへ保存（詳細データ込） ---
+        // 2. gamesテーブルへ保存（全データ）
         const { data: gameData, error: gameError } = await supabase.from('games').insert({
             player_names: names,
-            scores: finalScores,
-            raw_data: { grid: rawNumbers }, // 互換性のため残す
-            raw_data_full: { grid: rawNumbers } // 詳細再現用
+            raw_data_full: { grid: rawNumbers }
         }).select().single();
-
         if (gameError) throw gameError;
 
-        // --- 手順C: game_results（明細）へ4人分一括保存 ---
-        const resultsData = names.map((name, i) => {
+        // --- 3. 半荘ごとの明細（game_results）をループ保存 ---
+        const allGameResults = [];
+        for (let r = 0; r < 8; r++) {
+            const lineScores = [0, 1, 2, 3].map(p => (rawNumbers[r * 8 + p * 2] || 0) - (rawNumbers[r * 8 + p * 2 + 1] || 0));
+            
+            // 全員0（未入力行）ならスキップ
+            if (lineScores.every(s => s === 0)) continue;
+
+            const lineRanks = getRanks(lineScores, false); // 案1: 起家優先
+            names.forEach((name, i) => {
+                const pObj = playerData.find(pd => pd.name === name);
+                allGameResults.push({
+                    game_id: gameData.id,
+                    player_id: pObj ? pObj.id : null,
+                    player_name: name,
+                    score: lineScores[i],
+                    rank: lineRanks[i]
+                });
+            });
+        }
+        if (allGameResults.length > 0) {
+            await supabase.from('game_results').insert(allGameResults);
+        }
+
+        // --- 4. 最終結果（set_summaries）を保存 ---
+        const finalScores = [0, 1, 2, 3].map(p => {
+            let sum = 0;
+            for (let r = 0; r < 8; r++) sum += (rawNumbers[r * 8 + p * 2] || 0) - (rawNumbers[r * 8 + p * 2 + 1] || 0);
+            return sum;
+        });
+        const finalRanks = getRanks(finalScores, true); // 案2: 同順位あり
+
+        const finalSummaries = names.map((name, i) => {
             const pObj = playerData.find(pd => pd.name === name);
             return {
                 game_id: gameData.id,
                 player_id: pObj ? pObj.id : null,
                 player_name: name,
-                score: finalScores[i],
-                rank: ranks[i]
+                total_score: finalScores[i],
+                final_rank: finalRanks[i]
             };
         });
+        await supabase.from('set_summaries').insert(finalSummaries);
 
-        const { error: resError } = await supabase.from('game_results').insert(resultsData);
-        if (resError) throw resError;
-
-        alert("プロ級のデータ保存に成功しました！");
+        alert("全てのデータを自動仕分けして保存しました！");
         modal.style.display = 'none';
-        updatePlayerSuggestions(); // 候補リスト更新
+        updatePlayerSuggestions();
 
     } catch (err) {
         alert("エラー: " + err.message);
@@ -347,6 +369,7 @@ const updatePlayerSuggestions = async () => {
         submitBtn.innerText = "DBに保存";
     }
 };
+
 
     };
     initCloud();

@@ -1,3 +1,5 @@
+console.log("Cloud logic version 1.1 loaded");
+
 // --- Supabase設定 (ご自身のものに書き換えてください) ---
 const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_MiEHjzKEOTWweOp6h8Xqlg_0WvjDXKw';

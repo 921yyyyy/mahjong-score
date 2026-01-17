@@ -236,7 +236,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const updatePlayerSuggestions = async () => {
+        // playersテーブルから全プレイヤー名を取得
+        const { data, error } = await supabase
+            .from('players')
+            .select('name');
 
+        if (error) {
+            console.error("プレイヤー名の取得失敗:", error);
+            return;
+        }
+
+        // 重複を排除してdatalistにセット
+        const names = [...new Set(data.map(p => p.name))];
+        const datalist = document.getElementById('playerHistory');
+        if (datalist) {
+            datalist.innerHTML = names.map(name => `<option value="${name}">`).join('');
+        }
+    };
+
+    // ページ読み込み時に実行
+    updatePlayerSuggestions();
         const saveBtn = document.getElementById('saveData');
         const modal = document.getElementById('cloudModal');
         const playerInputsArea = document.getElementById('playerInputs');

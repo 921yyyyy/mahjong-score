@@ -374,3 +374,95 @@ const updatePlayerSuggestions = async () => {
     };
     initCloud();
 });
+// --- 1. ホーム画面のトップ3リーダーボードを表示 ---
+async function loadHomeSummary() {
+    const { data, error } = await supabase
+        .from('set_summaries')
+        .select('player_name, total_score')
+        .order('total_score', { ascending: false })
+        .limit(3);
+
+    if (error) return console.error(error);
+
+    const container = document.getElementById('homeTop3');
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div class="col-span-3 text-slate-500 text-xs py-4">No data yet</div>';
+        return;
+    }
+
+    const icons = ['gold', 'silver', 'bronze']; // 便宜上の順位
+    container.innerHTML = data.map((p, i) => `
+        <div class="space-y-1">
+            <div class="text-[10px] font-bold text-blue-400 uppercase tracking-tighter">Rank ${i+1}</div>
+            <div class="text-lg font-black italic truncate">${p.player_name}</div>
+            <div class="text-[10px] text-slate-400 font-mono">${p.total_score.toLocaleString()} PTS</div>
+        </div>
+    `).join('');
+}
+
+// --- 2. MLB風スタッツ表（Grid.js）の生成 ---
+let statsGrid = null; // 二重描画防止用
+
+async function loadMlbStats() {
+    const { data, error } = await supabase.from('game_results').select('*');
+    if (error) return console.error(error);
+
+    // データ集計（Map関数で効率的に計算）
+    const statsMap = data.reduce((acc, cur) => {
+        if (!acc[cur.player_name]) {
+            acc[cur.player_name] = { name: cur.player_name, g: 0, sumR: 0, w: 0, t2: 0, pts: 0 };
+        }
+        const p = acc[cur.player_name];
+        p.g++;
+        p.sumR += cur.rank;
+        if (cur.rank === 1) p.w++;
+        if (cur.rank <= 2) p.t2++;
+        p.pts += cur.score;
+        return acc;
+    }, {});
+
+    // Grid.js 用のデータ形式に変換
+    const tableData = Object.values(statsMap).map(p => [
+        p.name,
+        p.g,
+        (p.sumR / p.g).toFixed(2), // AVG Rank
+        ((p.w / p.g) * 100).toFixed(1) + '%', // Win%
+        ((p.t2 / p.g) * 100).toFixed(1) + '%', // Top2%
+        p.pts
+    ]);
+
+    // Grid.js の初期化または更新
+    const container = document.getElementById('mlb-grid-container');
+    
+    if (statsGrid) {
+        statsGrid.updateConfig({ data: tableData }).forceRender();
+    } else {
+        statsGrid = new gridjs.Grid({
+            columns: [
+                { name: "PLAYER", formatter: (cell) => gridjs.html(`<b class="text-blue-900">${cell}</b>`) },
+                { name: "G", sort: true },
+                { name: "AVG", sort: true },
+                { name: "W%", sort: true },
+                { name: "T2%", sort: true },
+                { name: "PTS", sort: true }
+            ],
+            data: tableData,
+            sort: true,
+            search: true, // これでMLB.comのような検索が可能に！
+            style: {
+                table: { 'font-size': '12px' },
+                th: { 'background-color': '#041e42', 'color': '#fff', 'text-align': 'center' },
+                td: { 'text-align': 'center', 'padding': '8px 4px' }
+            },
+            language: { 'search': { 'placeholder': 'Search players...' } }
+        }).render(container);
+    }
+}
+
+// --- 3. 初期起動時の読み込み設定 ---
+// index.html側のshowPage関数内からも呼び出されるように、
+// DOMContentLoadedで初期データをロードします
+document.addEventListener('DOMContentLoaded', () => {
+    loadHomeSummary();
+});
+

@@ -2,7 +2,7 @@ console.log("Cloud logic version 1.1 loaded");
 
 // --- Supabase設定 (ご自身のものに書き換えてください) ---
 const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_MiEHjzKEOTWweOp6h8Xqlg_0WvjDXKw';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 document.addEventListener('DOMContentLoaded', () => {

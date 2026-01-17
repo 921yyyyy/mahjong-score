@@ -2,208 +2,155 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🀄 MAHJONG HUB PRO</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>MAHJONG STATS PRO</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/gridjs/dist/gridjs.umd.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
-    
+    <script src="https://cdn.jsdelivr.net/npm/supabase-js@2"></script>
+    <script src="https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js"></script>
     <style>
-        body { background-color: #001628; color: #f1f5f9; font-family: 'Helvetica Neue', Arial, sans-serif; }
-        .canvas-container { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid #334155; }
-        #previewCanvas { width: 100%; display: block; }
-        input[type="number"] { -moz-appearance: textfield; background: transparent; font-weight: bold; outline: none; }
-        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type="range"] { height: 10px; border-radius: 5px; background: #334155; accent-color: #3b82f6; width: 100%; cursor: pointer; }
-        
-        .score-grid { display: grid; grid-template-columns: 30px repeat(4, 1fr); gap: 1px; background-color: #cbd5e1; border: 2px solid #64748b; }
-        .grid-header { background-color: #041e42; color: white; padding: 4px; text-align: center; font-size: 10px; font-weight: 900; }
-        .grid-cell { background-color: white; padding: 2px; display: flex; gap: 1px; }
-        .cell-num { background-color: #f8fafc; display: flex; items-center; justify-center; font-size: 10px; color: #94a3b8; font-weight: bold; }
-        .input-plus { background-color: #eff6ff !important; color: #1d4ed8; }
-        .input-minus { background-color: #fff1f2 !important; color: #be123c; }
-
-        /* ナビゲーション用 */
-        .nav-active { color: #3b82f6 !important; border-top: 2px solid #3b82f6; }
-        .hidden { display: none; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .nav-active { color: #041e42 !important; }
+        .hidden { display: none !important; }
     </style>
 </head>
-<body class="pb-24">
+<body class="bg-slate-50 text-slate-900 pb-20">
 
-    <section id="page-home" class="p-6 space-y-8 min-h-screen">
-        <header class="flex justify-between items-center">
-            <h1 class="text-3xl font-black italic tracking-tighter text-blue-400">MAHJONG HUB</h1>
-            <div class="bg-blue-500/10 p-2 rounded-full border border-blue-500/20">
-                <i data-lucide="user-round" class="text-blue-400"></i>
+    <div id="page-home" class="p-4 space-y-6">
+        <header class="flex justify-between items-center pt-4">
+            <div>
+                <h1 class="text-2xl font-black italic tracking-tighter text-blue-900">MAHJONG HUB</h1>
+                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Season 2026 • Live Stats</p>
+            </div>
+            <div class="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center">
+                <i data-lucide="user" class="w-6 h-6 text-slate-500"></i>
             </div>
         </header>
 
-        <div class="bg-[#041e42] p-5 rounded-3xl border border-slate-700 shadow-2xl">
-            <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Season Leaders</h3>
-            <div id="homeTop3" class="grid grid-cols-3 gap-4 text-center">
-                <div class="text-slate-500 text-xs py-4">Loading stats...</div>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 gap-4">
-            <button onclick="showPage('page-scanner')" class="flex items-center justify-between p-6 bg-blue-600 rounded-3xl shadow-lg shadow-blue-900/40 active:scale-95 transition-all">
-                <div class="text-left">
-                    <p class="text-[10px] font-bold opacity-70 uppercase">Start New Session</p>
-                    <h2 class="text-xl font-black italic">NEW SCAN</h2>
+        <section class="bg-blue-900 rounded-3xl p-6 text-white shadow-2xl relative overflow-hidden">
+            <div class="relative z-10">
+                <p class="text-xs font-bold text-blue-300 mb-1">LEADERBOARD TOP 3</p>
+                <div id="homeTop3" class="grid grid-cols-3 gap-4">
+                    <div class="animate-pulse bg-blue-800 h-16 rounded-xl"></div>
+                    <div class="animate-pulse bg-blue-800 h-16 rounded-xl"></div>
+                    <div class="animate-pulse bg-blue-800 h-16 rounded-xl"></div>
                 </div>
-                <i data-lucide="focus" class="w-8 h-8"></i>
-            </button>
+            </div>
+            <div class="absolute -right-4 -bottom-4 opacity-10">
+                <i data-lucide="trophy" class="w-32 h-32"></i>
+            </div>
+        </section>
+
+        <section class="grid grid-cols-2 gap-3">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                <i data-lucide="trending-up" class="w-5 h-5 text-emerald-500 mb-2"></i>
+                <p class="text-[10px] font-bold text-slate-400">WIN RATE</p>
+                <p class="text-xl font-black italic">--.-%</p>
+            </div>
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                <i data-lucide="target" class="w-5 h-5 text-blue-500 mb-2"></i>
+                <p class="text-[10px] font-bold text-slate-400">AVG RANK</p>
+                <p class="text-xl font-black italic">-.--</p>
+            </div>
+        </section>
+    </div>
+
+    <div id="page-scanner" class="hidden p-4">
+        <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
+            <div class="bg-slate-900 p-4 flex justify-between items-center text-white">
+                <h2 class="text-xs font-black tracking-widest">REALTIME SCANNER</h2>
+                <div class="flex gap-4">
+                    <label class="cursor-pointer bg-blue-600 px-3 py-1 rounded-full text-[10px] font-bold">
+                        カメラ起動 <input type="file" id="imageInput" accept="image/*" class="hidden">
+                    </label>
+                    <button id="rotateBtn" class="text-slate-400"><i data-lucide="rotate-cw" class="w-4 h-4"></i></button>
+                </div>
+            </div>
             
-            <button onclick="showPage('page-stats')" class="flex items-center justify-between p-6 bg-slate-800 rounded-3xl border border-slate-700 active:scale-95 transition-all">
-                <div class="text-left">
-                    <p class="text-[10px] font-bold opacity-70 uppercase">View Analytics</p>
-                    <h2 class="text-xl font-black italic">LEAGUE STATS</h2>
+            <div class="relative bg-black aspect-video flex items-center justify-center overflow-hidden">
+                <canvas id="previewCanvas" class="max-w-full max-h-full"></canvas>
+            </div>
+
+            <div class="p-4 bg-slate-50 grid grid-cols-4 gap-2 border-b">
+                <div class="flex flex-col">
+                    <label class="text-[8px] font-bold text-slate-400">X pos</label>
+                    <input type="range" id="adjustX" min="-500" max="500" value="0" class="w-full">
                 </div>
-                <i data-lucide="bar-chart-3" class="w-8 h-8 text-blue-400"></i>
+                <div class="col-span-4 mt-2">
+                    <button id="analyzeBtn" class="w-full py-3 bg-blue-900 text-white rounded-xl font-black text-xs">🎯 スキャン開始</button>
+                </div>
+            </div>
+
+            <div id="gridBody" class="grid grid-cols-5 bg-white">
+                </div>
+
+            <div class="grid grid-cols-5 bg-slate-800 text-white border-t border-slate-700">
+                <div class="py-3 text-center text-[10px] font-bold border-r border-slate-700">計</div>
+                <div id="totalA" class="py-3 text-center font-black">0</div>
+                <div id="totalB" class="py-3 text-center font-black">0</div>
+                <div id="totalC" class="py-3 text-center font-black">0</div>
+                <div id="totalD" class="py-3 text-center font-black">0</div>
+            </div>
+        </div>
+
+        <div id="debugLog" class="mt-4 p-3 bg-slate-900 text-emerald-400 font-mono text-[9px] rounded-xl h-24 overflow-y-auto"></div>
+        
+        <div class="mt-6">
+            <button id="saveData" disabled class="w-full py-5 bg-slate-600 text-slate-400 font-black rounded-2xl shadow-xl cursor-not-allowed">
+                ⚠️ 横の合計を0にしてください
             </button>
-        </div>
-    </section>
-
-    <section id="page-scanner" class="hidden p-2 sm:p-4 space-y-4">
-        <div class="max-w-xl mx-auto space-y-4">
-            <header class="p-3 bg-slate-800 rounded-2xl border border-slate-700 shadow-xl flex items-center justify-center gap-3">
-                <i data-lucide="scan-line" class="text-orange-400"></i>
-                <h1 class="text-lg font-black text-orange-400 tracking-widest uppercase">Scanner Mode</h1>
-            </header>
-
-            <div class="p-4 bg-slate-800 rounded-2xl shadow-lg space-y-4 border border-slate-700">
-                <input type="file" id="imageInput" accept="image/*" class="hidden">
-                <button onclick="document.getElementById('imageInput').click()" class="w-full py-4 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl shadow-lg transition-transform active:scale-95">
-                    📁 写真をアップロード
-                </button>
-                <div class="grid grid-cols-2 gap-3">
-                    <button id="rotateBtn" class="py-3 bg-slate-700 text-white font-bold rounded-xl border border-slate-600">↺ 角度調整</button>
-                    <button id="analyzeBtn" class="py-3 bg-orange-500 text-white font-bold rounded-xl shadow-lg">🎯 スキャン開始</button>
-                </div>
-            </div>
-
-            <div class="p-5 bg-slate-900 rounded-2xl border border-orange-500/30 space-y-5">
-                <div class="grid grid-cols-2 gap-x-6 gap-y-4">
-                    <div class="space-y-1">
-                        <div class="flex justify-between items-center"><span class="text-[10px] text-slate-400 font-bold">X</span><span id="valX" class="text-orange-400">0</span></div>
-                        <input type="range" id="adjustX" min="-500" max="800" value="0">
-                    </div>
-                    <div class="space-y-1">
-                        <div class="flex justify-between items-center"><span class="text-[10px] text-slate-400 font-bold">Y</span><span id="valY" class="text-orange-400">0</span></div>
-                        <input type="range" id="adjustY" min="-800" max="800" value="0">
-                    </div>
-                    <div class="space-y-1">
-                        <div class="flex justify-between items-center"><span class="text-[10px] text-slate-400 font-bold text-orange-300">W</span><span id="valW" class="text-orange-400">1.0</span></div>
-                        <input type="range" id="adjustW" min="0.5" max="3.5" step="0.01" value="1.0">
-                    </div>
-                    <div class="space-y-1">
-                        <div class="flex justify-between items-center"><span class="text-[10px] text-slate-400 font-bold">H</span><span id="valH" class="text-orange-400">1.0</span></div>
-                        <input type="range" id="adjustH" min="0.5" max="2.5" step="0.01" value="1.0">
-                    </div>
-                </div>
-            </div>
-
-            <div class="canvas-container shadow-2xl shadow-black/50">
-                <canvas id="previewCanvas"></canvas>
-            </div>
-
-            <div id="debugLog" class="h-24 p-3 bg-black/80 text-emerald-400 text-[10px] font-mono overflow-y-auto border border-emerald-900/30 rounded-xl">-- STANDBY --</div>
-
-            <div class="rounded-xl overflow-hidden border-2 border-slate-700">
-                <div class="score-grid">
-                    <div class="grid-header flex items-center justify-center">回</div>
-                    <div class="grid-header text-blue-300">P1</div>
-                    <div class="grid-header text-blue-300">P2</div>
-                    <div class="grid-header text-blue-300">P3</div>
-                    <div class="grid-header text-blue-300">P4</div>
-                    <div id="gridBody" class="contents text-slate-800"></div>
-                    <div class="bg-slate-200 py-3 text-[10px] font-black flex items-center justify-center border-t border-slate-400">計</div>
-                    <div id="totalA" class="bg-slate-50 py-3 text-center font-black border-t border-slate-400 text-slate-900">0</div>
-                    <div id="totalB" class="bg-slate-50 py-3 text-center font-black border-t border-slate-400 text-slate-900">0</div>
-                    <div id="totalC" class="bg-slate-50 py-3 text-center font-black border-t border-slate-400 text-slate-900">0</div>
-                    <div id="totalD" class="bg-slate-50 py-3 text-center font-black border-t border-slate-400 text-slate-900">0</div>
-                </div>
-            </div>
-
-            <button id="saveData" class="w-full py-5 bg-emerald-600 text-white font-black rounded-2xl shadow-xl active:scale-95">💾 結果をクラウドに保存</button>
-        </div>
-    </section>
-
-    <section id="page-history" class="hidden p-6">
-        <h2 class="text-2xl font-black italic mb-6">MATCH HISTORY</h2>
-        <div id="cards-container" class="space-y-4">
-            <p class="text-slate-500 text-center">Loading history...</p>
-        </div>
-    </section>
-
-    <section id="page-stats" class="hidden p-6 bg-[#001628]">
-        <h2 class="text-2xl font-black italic mb-6 tracking-tighter text-blue-400">LEAGUE STATS</h2>
-        <div id="mlb-grid-container" class="rounded-xl overflow-hidden bg-white"></div>
-    </section>
-
-    <nav class="fixed bottom-0 w-full bg-[#041e42] border-t border-slate-800 flex justify-around py-4 z-50">
-        <button onclick="showPage('page-home')" id="btn-home" class="nav-btn text-slate-400 transition-colors">
-            <i data-lucide="layout-dashboard"></i>
-        </button>
-        <button onclick="showPage('page-scanner')" id="btn-scanner" class="nav-btn text-slate-400 transition-colors">
-            <i data-lucide="focus"></i>
-        </button>
-        <button onclick="showPage('page-history')" id="btn-history" class="nav-btn text-slate-400 transition-colors">
-            <i data-lucide="history"></i>
-        </button>
-        <button onclick="showPage('page-stats')" id="btn-stats" class="nav-btn text-slate-400 transition-colors">
-            <i data-lucide="trophy"></i>
-        </button>
-    </nav>
-
-    <div id="cloudModal" style="display:none;" class="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-slate-800 w-full max-w-sm p-6 rounded-3xl border border-slate-700 shadow-2xl space-y-6">
-            <h2 class="text-center font-bold text-orange-400">対局者を決定</h2>
-            <div id="playerInputs" class="space-y-4"></div>
-            <div class="flex gap-3 pt-2">
-                <button onclick="document.getElementById('cloudModal').style.display='none'" class="flex-1 py-3 bg-slate-700 rounded-xl font-bold text-xs">キャンセル</button>
-                <button id="dbSubmitBtn" class="flex-1 py-3 bg-emerald-500 rounded-xl font-bold text-xs text-white">DBに保存</button>
-            </div>
         </div>
     </div>
-    
+
+    <div id="page-stats" class="hidden p-4 space-y-4">
+        <h2 class="text-xl font-black italic text-blue-900">LEAGUE STATS</h2>
+        <div id="mlb-grid-container" class="bg-white rounded-2xl shadow-sm overflow-hidden"></div>
+    </div>
+
+    <div id="page-history" class="hidden p-4 text-center py-20">
+        <i data-lucide="clock" class="w-12 h-12 text-slate-300 mx-auto mb-4"></i>
+        <p class="text-slate-400 font-bold">Coming Soon...</p>
+    </div>
+
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 pb-safe shadow-2xl z-50">
+        <div class="flex justify-around items-center h-16">
+            <button id="btn-home" onclick="showPage('page-home')" class="flex flex-col items-center gap-1 text-slate-400">
+                <i data-lucide="home" class="w-5 h-5"></i>
+                <span class="text-[10px] font-bold tracking-tighter">HUB</span>
+            </button>
+            <button id="btn-history" onclick="showPage('page-history')" class="flex flex-col items-center gap-1 text-slate-400">
+                <i data-lucide="list" class="w-5 h-5"></i>
+                <span class="text-[10px] font-bold tracking-tighter">HISTORY</span>
+            </button>
+            <div class="relative -mt-8">
+                <button id="btn-scanner" onclick="showPage('page-scanner')" class="flex items-center justify-center w-14 h-14 bg-blue-900 text-white rounded-full shadow-lg border-4 border-white active:scale-90 transition-transform">
+                    <i data-lucide="plus" class="w-7 h-7"></i>
+                </button>
+            </div>
+            <button id="btn-stats" onclick="showPage('page-stats')" class="flex flex-col items-center gap-1 text-slate-400">
+                <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                <span class="text-[10px] font-bold tracking-tighter">STATS</span>
+            </button>
+            <button id="btn-setting" class="flex flex-col items-center gap-1 text-slate-400">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+                <span class="text-[10px] font-bold tracking-tighter">CONFIG</span>
+            </button>
+        </div>
+    </nav>
+
+    <div id="cloudModal" class="fixed inset-0 bg-slate-900/90 items-center justify-center p-6 z-[100] hidden" style="display:none;">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm space-y-4">
+            <h3 class="text-lg font-black italic">PLAYER SETTING</h3>
+            <div id="playerInputs" class="space-y-3"></div>
+            <button id="dbSubmitBtn" class="w-full py-4 bg-blue-900 text-white font-black rounded-2xl">DBに保存</button>
+            <button onclick="document.getElementById('cloudModal').style.display='none'" class="w-full text-slate-400 text-xs font-bold">キャンセル</button>
+        </div>
+    </div>
+
     <datalist id="playerHistory"></datalist>
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
-    
-    <script>
-        // 画面切り替えロジック
-        function showPage(pageId) {
-            const pages = ['page-home', 'page-scanner', 'page-history', 'page-stats'];
-            pages.forEach(id => {
-                document.getElementById(id).classList.add('hidden');
-                // ナビボタンの色をリセット
-                const btnId = 'btn-' + id.split('-')[1];
-                document.getElementById(btnId).classList.remove('nav-active');
-            });
-
-            document.getElementById(pageId).classList.remove('hidden');
-            document.getElementById('btn-' + pageId.split('-')[1]).classList.add('nav-active');
-
-            // ページ固有の読み込み（必要に応じて）
-            if (pageId === 'page-stats') {
-                if (typeof loadMlbStats === 'function') loadMlbStats();
-            }
-            if (pageId === 'page-history') {
-                if (typeof loadHistory === 'function') loadHistory();
-            }
-
-            // アイコン再描画
-            lucide.createIcons();
-        }
-
-        // 初期表示
-        document.addEventListener('DOMContentLoaded', () => {
-            showPage('page-home');
-        });
-    </script>
 </body>
 </html>

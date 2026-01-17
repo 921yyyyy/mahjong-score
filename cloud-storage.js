@@ -1,6 +1,6 @@
 // --- Supabase設定 (ご自身のものに書き換えてください) ---
-const SUPABASE_URL = 'https://ここにあなたのURL.supabase.co';
-const SUPABASE_KEY = 'ここにあなたのAPIキー';
+const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_MiEHjzKEOTWweOp6h8Xqlg_0WvjDXKw';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 document.addEventListener('DOMContentLoaded', () => {

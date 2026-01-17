@@ -2,9 +2,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('previewCanvas');
     const ctx = canvas.getContext('2d');
     const logEl = document.getElementById('debugLog');
-    const scoreRows = document.getElementById('scoreRows');
+    const gridBody = document.getElementById('gridBody');
     
-    // スライダー群
     const sliders = {
         x: document.getElementById('adjustX'),
         y: document.getElementById('adjustY'),
@@ -25,23 +24,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function log(msg) {
         const div = document.createElement('div');
-        div.innerText = `${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'})} > ${msg}`;
+        div.innerText = `> ${msg}`;
         logEl.appendChild(div);
         logEl.scrollTop = logEl.scrollHeight;
     }
 
-    // スコア行生成（＋－がわかるように）
+    // --- 本格グリッド生成 ---
     function initScoreTable() {
-        scoreRows.innerHTML = '';
+        gridBody.innerHTML = '';
         for (let i = 1; i <= 8; i++) {
-            const row = document.createElement('div');
-            row.className = 'grid grid-cols-9 items-center py-1 text-center';
-            let html = `<div class="text-[9px] font-bold text-slate-300">${i}</div>`;
-            for(let j=0; j<8; j++) {
-                html += `<div class="px-0.5"><input type="number" class="w-full text-center text-xs py-1.5 bg-slate-50 rounded border border-slate-100 focus:bg-white" placeholder="0"></div>`;
+            // 回数セル
+            const numCell = document.createElement('div');
+            numCell.className = 'cell-num flex items-center justify-center border-b border-slate-100';
+            numCell.innerText = i;
+            gridBody.appendChild(numCell);
+
+            // A〜Dさんの入力セル
+            for(let p = 0; p < 4; p++) {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell border-b border-slate-100';
+                cell.innerHTML = `
+                    <input type="number" class="w-1/2 text-center text-xs py-2 input-plus rounded-sm" placeholder="+">
+                    <input type="number" class="w-1/2 text-center text-xs py-2 input-minus rounded-sm" placeholder="-">
+                `;
+                gridBody.appendChild(cell);
             }
-            row.innerHTML = html;
-            scoreRows.appendChild(row);
         }
     }
     initScoreTable();
@@ -71,9 +78,9 @@ document.addEventListener('DOMContentLoaded', () => {
             img.onload = () => {
                 currentImage = img;
                 rotation = 0;
-                log("画像読み込み完了。初期配置を行います...");
-                // 初期値（AI検知なしで安定させる）
-                baseGrid = { ox: img.width * 0.15, oy: img.height * 0.2, uw: img.width * 0.7, uh: img.height * 0.5 };
+                log("画像読み込み成功。赤枠を数字に合わせてください。");
+                // 初期値を設定
+                baseGrid = { ox: img.width * 0.1, oy: img.height * 0.2, uw: img.width * 0.8, uh: img.height * 0.5 };
                 updateAdjustment();
             };
             img.src = f.target.result;
@@ -92,13 +99,14 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.drawImage(currentImage, -currentImage.width / 2, -currentImage.height / 2);
         ctx.restore();
 
+        // 調整枠
         ctx.strokeStyle = "#f97316";
-        ctx.lineWidth = Math.max(4, canvas.width / 150);
+        ctx.lineWidth = Math.max(5, canvas.width / 120);
         ctx.strokeRect(gridConfig.ox, gridConfig.oy, gridConfig.uw, gridConfig.uh);
         
         // 8x8 ガイド
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = "rgba(249, 115, 22, 0.4)";
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "rgba(249, 115, 22, 0.5)";
         for(let i=1; i<8; i++) {
             let y = gridConfig.oy + (gridConfig.uh/8)*i;
             ctx.beginPath(); ctx.moveTo(gridConfig.ox, y); ctx.lineTo(gridConfig.ox + gridConfig.uw, y); ctx.stroke();
@@ -117,37 +125,37 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('analyzeBtn').onclick = async () => {
         if (!currentImage) return;
         const btn = document.getElementById('analyzeBtn');
-        btn.disabled = true; btn.innerText = "⏳ 解析中...";
-        log("解析開始...");
+        btn.disabled = true; btn.innerText = "⏳ 読込中...";
+        log("全マス目をスキャンしています...");
 
         const worker = await Tesseract.createWorker();
         await worker.loadLanguage('eng');
         await worker.initialize('eng');
         await worker.setParameters({ tessedit_char_whitelist: '0123456789' });
 
-        const inputs = document.querySelectorAll('#scoreRows input');
+        const inputs = document.querySelectorAll('#gridBody input');
         const cellW = gridConfig.uw / 8;
         const cellH = gridConfig.uh / 8;
 
         for (let r = 0; r < 8; r++) {
             for (let c = 0; c < 8; c++) {
                 const crop = document.createElement('canvas');
-                crop.width = 64; crop.height = 64;
+                crop.width = 80; crop.height = 80;
                 const cctx = crop.getContext('2d');
-                cctx.drawImage(canvas, gridConfig.ox + (c * cellW), gridConfig.oy + (r * cellH), cellW, cellH, 0, 0, 64, 64);
+                cctx.drawImage(canvas, gridConfig.ox + (c * cellW), gridConfig.oy + (r * cellH), cellW, cellH, 0, 0, 80, 80);
                 const { data: { text } } = await worker.recognize(crop);
                 inputs[r * 8 + c].value = text.replace(/[^0-9]/g, '');
             }
-            log(`行 ${r+1}/8 完了`);
+            log(`進捗: ${Math.round((r + 1) / 8 * 100)}% 完了`);
         }
         await worker.terminate();
-        btn.disabled = false; btn.innerText = "🎯 解析開始";
+        btn.disabled = false; btn.innerText = "🎯 スキャン開始";
         log("✅ 解析完了");
         calcTotals();
     };
 
     function calcTotals() {
-        const inputs = document.querySelectorAll('#scoreRows input');
+        const inputs = document.querySelectorAll('#gridBody input');
         const totals = [0, 0, 0, 0];
         for(let r = 0; r < 8; r++) {
             for(let p = 0; p < 4; p++) {
@@ -159,8 +167,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ['A','B','C','D'].forEach((id, i) => {
             const el = document.getElementById(`total${id}`);
             el.innerText = (totals[i] >= 0 ? '+' : '') + totals[i];
-            el.className = totals[i] >= 0 ? 'text-indigo-600' : 'text-rose-500';
+            el.className = `bg-slate-50 py-3 text-center font-black text-sm border-t border-slate-400 ${totals[i] >= 0 ? 'text-indigo-600' : 'text-rose-500'}`;
         });
     }
-    scoreRows.addEventListener('input', calcTotals);
+    gridBody.addEventListener('input', calcTotals);
 });

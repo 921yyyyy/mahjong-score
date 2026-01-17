@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🀄 高精度解析 (Perfect Adjust + Cloud)</title>
+    <title>🀄 高精度解析 (1の状態 + Cloud)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -13,53 +13,41 @@
         #previewCanvas { width: 100%; display: block; }
         input[type="number"] { -moz-appearance: textfield; background: transparent; }
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type="range"] { height: 8px; border-radius: 4px; background: #334155; accent-color: #f97316; width: 100%; }
+        input[type="range"] { height: 10px; border-radius: 5px; background: #334155; accent-color: #f97316; width: 100%; }
         .slider-label { font-size: 10px; color: #94a3b8; font-weight: bold; }
-        #saveModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 50; align-items: center; justify-content: center; padding: 20px; }
+        #saveModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 50; align-items: center; justify-content: center; padding: 20px; }
     </style>
 </head>
-<body class="p-2 sm:p-4 pb-20">
+<body class="p-4 pb-20">
     <div class="max-w-lg mx-auto space-y-4">
-        <header class="p-4 bg-slate-800 rounded-2xl border border-slate-700 flex justify-between items-center">
-            <h1 class="text-xl font-black text-orange-400 italic">MAHJONG ANALYZER v2</h1>
-            <button id="viewHistory" class="text-[10px] bg-slate-700 px-3 py-1 rounded border border-slate-600">履歴</button>
+        <header class="p-3 bg-slate-800 rounded-2xl border border-slate-700 shadow-xl flex items-center justify-between">
+            <h1 class="text-lg font-black text-orange-400 tracking-widest italic">MAHJONG ANALYZER v2</h1>
+            <button id="viewHistory" class="text-[10px] bg-slate-700 px-3 py-1 rounded">履歴</button>
         </header>
 
-        <div class="p-4 bg-slate-800 rounded-2xl shadow-lg space-y-4">
+        <div class="p-4 bg-slate-800 rounded-2xl shadow-lg space-y-4 border border-slate-700">
             <input type="file" id="imageInput" accept="image/*" class="hidden">
-            <button onclick="document.getElementById('imageInput').click()" class="w-full py-4 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl shadow-lg transition-transform active:scale-95">📷 画像を選択</button>
+            <button onclick="document.getElementById('imageInput').click()" class="w-full py-4 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl">📷 画像を選択</button>
             <div class="grid grid-cols-2 gap-3">
                 <button id="rotateBtn" class="py-3 bg-slate-700 text-white font-bold rounded-xl border border-slate-600">↺ 回転</button>
-                <button id="analyzeBtn" class="py-3 bg-orange-500 text-white font-bold rounded-xl shadow-lg">🎯 解析開始</button>
+                <button id="analyzeBtn" class="py-3 bg-orange-500 text-white font-bold rounded-xl">🎯 解析開始</button>
             </div>
         </div>
 
         <div class="p-5 bg-slate-900 rounded-2xl border border-orange-500/30 space-y-4">
-            <div class="grid grid-cols-2 gap-4">
-                <div class="space-y-1">
-                    <div class="flex justify-between"><span class="slider-label">左右(X)</span><span id="valX" class="text-[10px]">0</span></div>
-                    <input type="range" id="adjustX" min="-500" max="800" value="0">
-                </div>
-                <div class="space-y-1">
-                    <div class="flex justify-between"><span class="slider-label">上下(Y)</span><span id="valY" class="text-[10px]">0</span></div>
-                    <input type="range" id="adjustY" min="-800" max="800" value="0">
-                </div>
-                <div class="space-y-1">
-                    <div class="flex justify-between"><span class="slider-label">横幅(W)</span><span id="valW" class="text-[10px]">1.0x</span></div>
-                    <input type="range" id="adjustW" min="0.5" max="3.5" step="0.01" value="1.0">
-                </div>
-                <div class="space-y-1">
-                    <div class="flex justify-between"><span class="slider-label">高さ(H)</span><span id="valH" class="text-[10px]">1.0x</span></div>
-                    <input type="range" id="adjustH" min="0.5" max="2.5" step="0.01" value="1.0">
-                </div>
+            <div class="grid grid-cols-2 gap-x-6 gap-y-4">
+                <div><div class="flex justify-between"><span class="slider-label">左右(X)</span><span id="valX" class="text-[10px] text-orange-400">0</span></div><input type="range" id="adjustX" min="-500" max="800" value="0"></div>
+                <div><div class="flex justify-between"><span class="slider-label">上下(Y)</span><span id="valY" class="text-[10px] text-orange-400">0</span></div><input type="range" id="adjustY" min="-800" max="800" value="0"></div>
+                <div><div class="flex justify-between"><span class="slider-label">横幅(W)</span><span id="valW" class="text-[10px] text-orange-400">1.0x</span></div><input type="range" id="adjustW" min="0.5" max="3.5" step="0.01" value="1.0"></div>
+                <div><div class="flex justify-between"><span class="slider-label">高さ(H)</span><span id="valH" class="text-[10px] text-orange-400">1.0x</span></div><input type="range" id="adjustH" min="0.5" max="2.5" step="0.01" value="1.0"></div>
             </div>
         </div>
 
         <div class="canvas-container shadow-2xl"><canvas id="previewCanvas"></canvas></div>
 
-        <div id="debugLog" class="h-20 p-3 bg-black text-emerald-400 text-[10px] font-mono overflow-y-auto border border-emerald-900/30 rounded-xl">-- 待機中 --</div>
+        <div id="debugLog" class="h-20 p-3 bg-black text-emerald-400 text-[10px] font-mono overflow-y-auto border border-emerald-900/30 rounded-xl">-- システム準備完了 --</div>
 
-        <div class="bg-white rounded-2xl shadow-2xl overflow-hidden text-slate-800">
+        <div class="bg-white rounded-2xl shadow-2xl overflow-hidden text-slate-800 border-2 border-slate-700">
             <div class="grid grid-cols-9 bg-slate-100 py-2 text-[9px] font-black text-center border-b">
                 <div class="flex items-center justify-center">回</div>
                 <div class="col-span-2 border-x">A (+/-)</div><div class="col-span-2 border-r">B (+/-)</div>
@@ -67,20 +55,20 @@
             </div>
             <div id="scoreRows" class="divide-y divide-slate-100"></div>
             <div class="grid grid-cols-5 py-4 bg-slate-50 text-center text-sm font-black border-t-2">
-                <div class="text-slate-400 text-[10px] self-center">TOTAL</div>
+                <div class="text-slate-400 text-[9px] self-center">TOTAL</div>
                 <div id="totalA">0</div><div id="totalB">0</div><div id="totalC">0</div><div id="totalD">0</div>
             </div>
         </div>
 
-        <button id="preSaveBtn" class="w-full py-5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-xl transition-all active:scale-95">💾 クラウドに保存</button>
+        <button id="preSaveBtn" class="w-full py-5 bg-emerald-600 text-white font-black rounded-2xl shadow-xl">💾 プレイヤーを選んで保存</button>
     </div>
 
     <div id="saveModal"><div class="bg-slate-800 w-full max-w-sm p-6 rounded-3xl space-y-6 border border-slate-600 shadow-2xl">
         <h2 class="text-center font-bold text-orange-400">対局者を紐付け</h2>
         <div id="playerInputs" class="space-y-3"></div>
         <div class="flex gap-3">
-            <button onclick="document.getElementById('saveModal').style.display='none'" class="flex-1 py-3 bg-slate-700 rounded-xl font-bold">戻る</button>
-            <button id="finalSaveBtn" class="flex-1 py-3 bg-emerald-500 rounded-xl font-bold">保存実行</button>
+            <button onclick="document.getElementById('saveModal').style.display='none'" class="flex-1 py-3 bg-slate-700 rounded-xl font-bold text-sm">戻る</button>
+            <button id="finalSaveBtn" class="flex-1 py-3 bg-emerald-500 rounded-xl font-bold text-sm">保存実行</button>
         </div>
         <datalist id="playerList"></datalist>
     </div></div>

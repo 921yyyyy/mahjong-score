@@ -3,87 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🀄 高精度解析 (Stable Build)</title>
+    <title>🀄 高精度解析 (Perfect Adjust)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         body { background-color: #0f172a; color: #f1f5f9; font-family: sans-serif; }
         .canvas-container { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid #334155; }
         #previewCanvas { width: 100%; display: block; }
-        input[type="number"] { -moz-appearance: textfield; background: transparent; color: #1e293b; font-weight: bold; }
+        input[type="number"] { -moz-appearance: textfield; background: transparent; }
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type="range"] { height: 10px; border-radius: 5px; background: #334155; accent-color: #f97316; width: 100%; cursor: pointer; }
+        input[type="range"] { height: 8px; border-radius: 4px; background: #334155; accent-color: #f97316; width: 100%; }
+        .slider-label { font-size: 10px; color: #94a3b8; font-weight: bold; }
     </style>
 </head>
-<body class="p-2 sm:p-4">
+<body class="p-2 sm:p-4 pb-20">
     <div class="max-w-lg mx-auto space-y-4">
-        <header class="p-4 bg-slate-800 rounded-2xl shadow-2xl border border-slate-700">
-            <h1 class="text-xl font-black text-center text-orange-400">MAHJONG OCR v2.0</h1>
+        <header class="p-4 bg-slate-800 rounded-2xl border border-slate-700 shadow-xl">
+            <h1 class="text-xl font-black text-center text-orange-400 italic">MAHJONG ANALYZER PRO</h1>
         </header>
 
         <div class="p-4 bg-slate-800 rounded-2xl shadow-lg space-y-4">
             <input type="file" id="imageInput" accept="image/*" class="hidden">
-            <button onclick="document.getElementById('imageInput').click()" class="w-full py-4 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95">
-                📷 写真を選択 / 撮影
+            <button onclick="document.getElementById('imageInput').click()" class="w-full py-4 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl shadow-lg transition-transform active:scale-95">
+                📷 画像を選択
             </button>
-            
             <div class="grid grid-cols-2 gap-3">
-                <button id="rotateBtn" class="py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl border border-slate-600">↺ 回転</button>
-                <button id="analyzeBtn" class="py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl shadow-orange-500/20 shadow-lg">🎯 解析開始</button>
+                <button id="rotateBtn" class="py-3 bg-slate-700 text-white font-bold rounded-xl border border-slate-600">↺ 回転</button>
+                <button id="analyzeBtn" class="py-3 bg-orange-500 text-white font-bold rounded-xl shadow-lg">🎯 解析開始</button>
             </div>
         </div>
 
-        <div class="p-5 bg-slate-900 rounded-2xl border border-orange-500/30 space-y-5">
-            <div class="space-y-2">
-                <div class="flex justify-between items-center">
-                    <span class="text-xs font-bold text-orange-400">上下位置の微調整</span>
-                    <span id="valY" class="px-2 py-0.5 bg-orange-500/20 text-orange-400 text-xs rounded">0px</span>
+        <div class="p-5 bg-slate-900 rounded-2xl border border-orange-500/30 space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-1">
+                    <div class="flex justify-between"><span class="slider-label">左右(X)</span><span id="valX" class="text-[10px]">0</span></div>
+                    <input type="range" id="adjustX" min="-400" max="400" value="0">
                 </div>
-                <input type="range" id="adjustY" min="-600" max="600" value="0">
-            </div>
-            <div class="space-y-2">
-                <div class="flex justify-between items-center">
-                    <span class="text-xs font-bold text-orange-400">枠の高さ調整</span>
-                    <span id="valH" class="px-2 py-0.5 bg-orange-500/20 text-orange-400 text-xs rounded">1.0x</span>
+                <div class="space-y-1">
+                    <div class="flex justify-between"><span class="slider-label">上下(Y)</span><span id="valY" class="text-[10px]">0</span></div>
+                    <input type="range" id="adjustY" min="-600" max="600" value="0">
                 </div>
-                <input type="range" id="adjustH" min="0.5" max="2.5" step="0.01" value="1.0">
+                <div class="space-y-1">
+                    <div class="flex justify-between"><span class="slider-label">横幅(W)</span><span id="valW" class="text-[10px]">1.0</span></div>
+                    <input type="range" id="adjustW" min="0.5" max="1.5" step="0.01" value="1.0">
+                </div>
+                <div class="space-y-1">
+                    <div class="flex justify-between"><span class="slider-label">高さ(H)</span><span id="valH" class="text-[10px]">1.0</span></div>
+                    <input type="range" id="adjustH" min="0.5" max="2.0" step="0.01" value="1.0">
+                </div>
             </div>
-            <p class="text-[10px] text-slate-500 text-center leading-relaxed">
-                赤枠を「1」の行から「8」の行に重なるように調整してください。<br>
-                スライダーを動かすと、上の画像内の赤枠がリアルタイムで動きます。
-            </p>
         </div>
 
         <div class="canvas-container shadow-2xl">
             <canvas id="previewCanvas"></canvas>
         </div>
 
-        <div id="debugLog" class="h-28 p-3 bg-black text-emerald-400 text-[10px] font-mono overflow-y-auto border border-emerald-900/30 rounded-xl shadow-inner">
-            -- System Standby --
+        <div id="debugLog" class="h-24 p-3 bg-black text-emerald-400 text-[10px] font-mono overflow-y-auto border border-emerald-900/30 rounded-xl">
+            -- 待機中 --
         </div>
 
-        <div class="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 text-slate-800">
-            <div class="grid grid-cols-9 bg-slate-100 py-3 text-[10px] font-black text-center border-b tracking-tighter">
-                <div class="text-slate-400">回</div>
-                <div colspan="2" class="border-x border-slate-200">Aさん</div>
-                <div colspan="2" class="border-r border-slate-200">Bさん</div>
-                <div colspan="2" class="border-r border-slate-200">Cさん</div>
-                <div colspan="2">Dさん</div>
+        <div class="bg-white rounded-2xl shadow-2xl overflow-hidden text-slate-800">
+            <div class="grid grid-cols-9 bg-slate-100 py-2 text-[9px] font-black text-center border-b border-slate-200">
+                <div class="flex items-center justify-center">回</div>
+                <div colspan="2" class="border-x">Aさん (+ / -)</div>
+                <div colspan="2" class="border-r">Bさん (+ / -)</div>
+                <div colspan="2" class="border-r">Cさん (+ / -)</div>
+                <div colspan="2">Dさん (+ / -)</div>
             </div>
             <div id="scoreRows" class="divide-y divide-slate-100">
                 </div>
-            <div class="grid grid-cols-5 py-5 bg-slate-50 text-center text-sm font-black border-t-2 border-slate-200">
-                <div class="text-slate-400 text-xs flex items-center justify-center">TOTAL</div>
-                <div id="totalA" class="flex items-center justify-center">0</div>
-                <div id="totalB" class="flex items-center justify-center">0</div>
-                <div id="totalC" class="flex items-center justify-center">0</div>
-                <div id="totalD" class="flex items-center justify-center">0</div>
+            <div class="grid grid-cols-5 py-4 bg-slate-50 text-center text-sm font-black border-t-2 border-slate-200">
+                <div class="text-slate-400 text-[10px] self-center">TOTAL</div>
+                <div id="totalA">0</div><div id="totalB">0</div><div id="totalC">0</div><div id="totalD">0</div>
             </div>
         </div>
-
-        <button id="saveData" class="w-full py-5 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-2xl shadow-xl shadow-emerald-500/20 transition-all active:scale-95 mb-10">
-            結果をデバイスに保存
-        </button>
     </div>
     <script src="app.js"></script>
 </body>

@@ -297,6 +297,19 @@ const updatePlayerSuggestions = async () => {
                 if (error) throw error;
                 alert("クラウド保存に成功しました！");
                 modal.style.display = 'none';
+                // --- submitBtn.onclick の try ブロック内、insert成功のすぐ後あたり ---
+
+// 1. 入力された名前から「未設定」を除外してリスト化
+const newPlayers = names.filter(n => n !== '未設定').map(n => ({ name: n }));
+
+// 2. playersテーブルに保存（既存の名前がある場合は何もしない）
+if (newPlayers.length > 0) {
+    await supabase.from('players').upsert(newPlayers, { onConflict: 'name' });
+}
+
+// 3. 次回の入力のために候補リストを更新
+updatePlayerSuggestions(); 
+
             } catch (err) {
                 alert("エラー: " + err.message);
             } finally {

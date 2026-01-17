@@ -2,56 +2,82 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>麻雀DXスコアラー | Debug</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🀄 高精度解析 (Debug Mode)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
-        #previewCanvas { background-color: #000; width: 100%; height: auto; display: block; }
-        .debug-console { background: #000; color: #0f0; font-family: monospace; font-size: 10px; padding: 10px; height: 120px; overflow-y: auto; border: 1px solid #333; }
+        body { background-color: #1a202c; color: #e2e8f0; font-family: sans-serif; }
+        .canvas-container { position: relative; width: 100%; border-radius: 8px; overflow: hidden; background: #000; border: 1px solid #2d3748; }
+        #previewCanvas { width: 100%; display: block; }
+        input[type="number"] { -moz-appearance: textfield; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        /* スライダーの見た目調整 */
+        input[type="range"] { height: 6px; border-radius: 3px; background: #4a5568; accent-color: #ed8936; }
     </style>
 </head>
-<body class="bg-gray-100 pb-32">
-    <div class="max-w-2xl mx-auto bg-white shadow-xl min-h-screen">
-        <div class="bg-slate-900 p-4 text-white">
-            <h1 class="text-lg font-bold mb-3">🀄 高精度解析 (Debug Mode)</h1>
-            
-            <div class="space-y-3">
-                <input type="file" id="imageInput" accept="image/*" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100">
-                
-                <div class="flex gap-2">
-                    <button id="rotateBtn" class="flex-1 bg-indigo-600 py-3 rounded-lg font-bold">↻ 回転</button>
-                    <button id="analyzeBtn" class="flex-1 bg-amber-500 py-3 rounded-lg text-black font-bold">🎯 解析開始</button>
+<body class="p-2">
+    <div class="max-w-lg mx-auto space-y-4">
+        <header class="flex items-center gap-2 p-2 bg-slate-800 rounded-lg shadow-lg">
+            <span class="text-2xl">🀄</span>
+            <h1 class="text-lg font-bold">高精度解析 (Debug Mode)</h1>
+        </header>
+
+        <div class="p-4 bg-slate-800 rounded-xl shadow-md space-y-3">
+            <input type="file" id="imageInput" accept="image/*" class="hidden">
+            <button onclick="document.getElementById('imageInput').click()" class="w-full py-3 px-4 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-bold rounded-lg flex items-center justify-center gap-2 transition-all">
+                ファイルを読み込む
+            </button>
+
+            <div class="flex gap-2">
+                <button id="rotateBtn" class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center justify-center gap-2">
+                    ↺ 回転
+                </button>
+                <button id="analyzeBtn" class="flex-[1.5] py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-lg flex items-center justify-center gap-2">
+                    🎯 解析開始
+                </button>
+            </div>
+        </div>
+
+        <div class="p-3 bg-gray-900 border border-orange-500/30 rounded-xl space-y-3">
+            <div class="flex items-center gap-3">
+                <span class="text-[11px] font-bold text-orange-400 w-16">上下移動</span>
+                <input type="range" id="adjustY" min="-300" max="300" value="0" class="flex-1 cursor-pointer">
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-[11px] font-bold text-orange-400 w-16">枠の高さ</span>
+                <input type="range" id="adjustH" min="0.5" max="2.0" step="0.01" value="1.0" class="flex-1 cursor-pointer">
+            </div>
+            <p class="text-[10px] text-gray-500 text-center italic">※AIの赤枠がズレた場合、上のバーで数字に合わせてください</p>
+        </div>
+
+        <div class="canvas-container shadow-2xl">
+            <canvas id="previewCanvas"></canvas>
+        </div>
+
+        <div id="debugLog" class="h-32 p-2 bg-black text-green-400 text-[10px] font-mono overflow-y-auto border border-green-900/50 rounded-lg">
+            -- System Ready --
+        </div>
+
+        <div class="bg-white text-slate-900 rounded-xl shadow-xl overflow-hidden">
+            <div class="grid grid-cols-9 bg-slate-100 py-2 text-[10px] font-bold text-center border-b">
+                <div>回</div><div colspan="2">A</div><div colspan="2">B</div><div colspan="2">C</div><div colspan="2">D</div>
+            </div>
+            <div id="scoreRows" class="divide-y divide-gray-100">
                 </div>
-            </div>
-
-            <div class="mt-4 border-2 border-slate-700 rounded overflow-hidden">
-                <canvas id="previewCanvas"></canvas>
-            </div>
-
-            <div id="debugLog" class="debug-console mt-3">
-                <div>-- System Ready --</div>
+            <div class="grid grid-cols-5 py-4 bg-slate-50 text-center text-sm font-bold border-t">
+                <div class="text-gray-400 text-xs self-center">合計</div>
+                <div id="totalA" class="text-blue-600">0</div>
+                <div id="totalB" class="text-blue-600">0</div>
+                <div id="totalC" class="text-blue-600">0</div>
+                <div id="totalD" class="text-blue-600">0</div>
             </div>
         </div>
 
-        <div class="bg-gray-200 p-1 flex font-bold text-[10px] text-center sticky top-0 z-10">
-            <div class="w-8">回</div>
-            <div class="flex-1 grid grid-cols-4 gap-1">
-                <div>A</div><div>B</div><div>C</div><div>D</div>
-            </div>
-        </div>
-        <div id="scoreRows" class="p-1 space-y-1 bg-white"></div>
-
-        <div class="fixed bottom-0 left-0 right-0 max-w-2xl mx-auto bg-slate-50 border-t p-4 shadow-2xl z-20">
-            <div class="grid grid-cols-5 text-center font-mono font-bold mb-4">
-                <div class="text-gray-400 text-xs">合計</div>
-                <div id="totalA">0</div><div id="totalB">0</div><div id="totalC">0</div><div id="totalD">0</div>
-            </div>
-            <button id="saveBtn" class="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold">データを保存</button>
-        </div>
+        <button id="saveData" class="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg transition-transform active:scale-95">
+            データを保存
+        </button>
     </div>
-
     <script src="app.js"></script>
 </body>
 </html>

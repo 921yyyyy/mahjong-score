@@ -29,13 +29,17 @@ document.addEventListener('DOMContentLoaded', () => {
         logEl.scrollTop = logEl.scrollHeight;
     }
 
-    // --- 本格グリッド生成 ---
+    // --- 本格グリッド生成（行単位の調整ボタンを追加） ---
     function initScoreTable() {
         gridBody.innerHTML = '';
         for (let i = 1; i <= 8; i++) {
+            // 回数セル + 行調整ボタン
             const numCell = document.createElement('div');
-            numCell.className = 'cell-num flex items-center justify-center border-b border-slate-100';
-            numCell.innerText = i;
+            numCell.className = 'cell-num flex flex-col items-center justify-center border-b border-slate-100 bg-slate-50 relative';
+            numCell.innerHTML = `
+                <span class="text-[10px] font-bold">${i}</span>
+                <button onclick="adjustLine(${i-1})" class="mt-1 text-[8px] bg-orange-500 text-white px-1.5 py-0.5 rounded shadow-sm active:scale-90 transition-transform">整</button>
+            `;
             gridBody.appendChild(numCell);
 
             for(let p = 0; p < 4; p++) {
@@ -50,6 +54,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     initScoreTable();
+
+    // 行ごとの自動調整関数（Dさんのプラス/マイナスをいじって合計を0にする）
+    window.adjustLine = (rowIdx) => {
+        const inputs = document.querySelectorAll('#gridBody input');
+        let otherPlayersSum = 0;
+        
+        // A, B, Cさんの合計を計算
+        for(let p = 0; p < 3; p++) {
+            const plus = parseInt(inputs[rowIdx * 8 + p * 2].value) || 0;
+            const minus = parseInt(inputs[rowIdx * 8 + p * 2 + 1].value) || 0;
+            otherPlayersSum += (plus - minus);
+        }
+
+        // Dさんの入力欄（プラスは 8k+6, マイナスは 8k+7）
+        const dPlusInput = inputs[rowIdx * 8 + 6];
+        const dMinusInput = inputs[rowIdx * 8 + 7];
+
+        if (otherPlayersSum > 0) {
+            dPlusInput.value = 0;
+            dMinusInput.value = otherPlayersSum;
+        } else {
+            dPlusInput.value = Math.abs(otherPlayersSum);
+            dMinusInput.value = 0;
+        }
+        
+        calcTotals();
+    };
 
     function updateAdjustment() {
         if (!currentImage) return;
@@ -149,28 +180,40 @@ document.addEventListener('DOMContentLoaded', () => {
         calcTotals();
     };
 
-    // --- バリデーション機能付き合計計算 ---
+    // --- 行単位の整合性チェック付き計算 ---
     function calcTotals() {
         const inputs = document.querySelectorAll('#gridBody input');
         const totals = [0, 0, 0, 0];
+        let invalidLines = [];
+
         for(let r = 0; r < 8; r++) {
+            let lineSum = 0;
             for(let p = 0; p < 4; p++) {
                 const plus = parseInt(inputs[(r * 8) + (p * 2)].value) || 0;
                 const minus = parseInt(inputs[(r * 8) + (p * 2) + 1].value) || 0;
-                totals[p] += (plus - minus);
+                const score = plus - minus;
+                totals[p] += score;
+                lineSum += score;
+            }
+            
+            // 行ごとの背景色フィードバック（横の合計が0でない場合は赤くする）
+            const rowLabelCell = gridBody.children[r * 5];
+            if (lineSum !== 0) {
+                rowLabelCell.style.backgroundColor = '#fee2e2'; // 赤背景
+                invalidLines.push(r + 1);
+            } else {
+                rowLabelCell.style.backgroundColor = ''; // 通常
             }
         }
 
-        const grandTotal = totals.reduce((a, b) => a + b, 0);
         const saveBtn = document.getElementById('saveData');
-        
-        if (grandTotal === 0) {
+        if (invalidLines.length === 0) {
             saveBtn.disabled = false;
-            saveBtn.innerHTML = `💾 結果を保存 (合計: ${grandTotal} ✅)`;
+            saveBtn.innerHTML = `💾 結果を保存 (全行OK ✅)`;
             saveBtn.className = "w-full py-5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-xl transition-all active:scale-95";
         } else {
             saveBtn.disabled = true;
-            saveBtn.innerHTML = `⚠️ 合計を0にしてください (現在: ${grandTotal > 0 ? '+' : ''}${grandTotal})`;
+            saveBtn.innerHTML = `⚠️ 横の合計を0にしてください (行: ${invalidLines.join(',')})`;
             saveBtn.className = "w-full py-5 bg-slate-600 text-slate-400 font-black rounded-2xl shadow-xl cursor-not-allowed";
         }
 
@@ -179,33 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
             el.innerText = (totals[i] >= 0 ? '+' : '') + totals[i];
             el.className = `bg-slate-50 py-3 text-center font-black text-sm border-t border-slate-400 ${totals[i] >= 0 ? 'text-indigo-600' : 'text-rose-500'}`;
         });
-    }
-
-    // 自動調整の実行関数
-    function runAutoAdjust() {
-        const inputs = document.querySelectorAll('#gridBody input');
-        let currentSum = 0;
-        for(let r = 0; r < 8; r++) {
-            for(let p = 0; p < 4; p++) {
-                if(r === 7 && p === 3) continue; 
-                const plus = parseInt(inputs[(r * 8) + (p * 2)].value) || 0;
-                const minus = parseInt(inputs[(r * 8) + (p * 2) + 1].value) || 0;
-                currentSum += (plus - minus);
-            }
-        }
-        const lastPlusInput = inputs[(7 * 8) + (3 * 2)];
-        const lastMinusInput = inputs[(7 * 8) + (3 * 2) + 1];
-        
-        if (currentSum > 0) {
-            lastPlusInput.value = 0;
-            lastMinusInput.value = currentSum;
-        } else {
-            lastPlusInput.value = Math.abs(currentSum);
-            lastMinusInput.value = 0;
-        }
-        
-        calcTotals();
-        alert("合計が0になるよう自動調整しました。");
     }
 
     gridBody.addEventListener('input', calcTotals);
@@ -229,21 +245,14 @@ document.addEventListener('DOMContentLoaded', () => {
         saveBtn.onclick = () => {
             playerInputsArea.innerHTML = '';
             ['A', 'B', 'C', 'D'].forEach(p => {
-                let adjustBtn = (p === 'D') ? `<button id="autoAdjustBtn" class="text-[9px] bg-orange-500 text-white px-2 py-1 rounded-md ml-2">残りを自動入力</button>` : '';
                 playerInputsArea.innerHTML += `
                     <div class="space-y-1">
-                        <div class="flex items-center justify-between">
-                            <label class="text-[10px] text-slate-400 font-bold ml-1">${p}さんの名前</label>
-                            ${adjustBtn}
-                        </div>
+                        <label class="text-[10px] text-slate-400 font-bold ml-1">${p}さんの名前</label>
                         <input type="text" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-white text-sm" 
                                placeholder="名前を入力" list="playerHistory">
                     </div>`;
             });
             modal.style.display = 'flex';
-            
-            const autoBtn = document.getElementById('autoAdjustBtn');
-            if(autoBtn) autoBtn.onclick = runAutoAdjust;
         };
 
         submitBtn.onclick = async () => {

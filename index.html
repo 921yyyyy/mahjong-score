@@ -93,5 +93,24 @@
         </button>
     </div>
     <script src="app.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <div id="cloudModal" style="display:none;" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-slate-800 w-full max-w-sm p-6 rounded-3xl border border-slate-700 shadow-2xl space-y-6">
+            <h2 class="text-center font-bold text-orange-400">対局者を決定</h2>
+            <div id="playerInputs" class="space-y-4">
+                </div>
+            <div class="flex gap-3 pt-2">
+                <button onclick="document.getElementById('cloudModal').style.display='none'" class="flex-1 py-3 bg-slate-700 rounded-xl font-bold text-xs">キャンセル</button>
+                <button id="dbSubmitBtn" class="flex-1 py-3 bg-emerald-500 rounded-xl font-bold text-xs">DBに保存</button>
+            </div>
+        </div>
+    </div>
+    <datalist id="playerHistory"></datalist>
+
+    <script src="cloud-storage.js"></script>
+</body>
+</html>
+
 </body>
 </html>

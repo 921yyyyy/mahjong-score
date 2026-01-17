@@ -276,47 +276,78 @@ const updatePlayerSuggestions = async () => {
         };
 
         submitBtn.onclick = async () => {
-            submitBtn.disabled = true;
-            submitBtn.innerText = "保存中...";
-            const names = Array.from(playerInputsArea.querySelectorAll('input')).map(i => i.value || '未設定');
-            const scoreInputs = document.querySelectorAll('#gridBody input');
-            const rawNumbers = Array.from(scoreInputs).map(i => parseInt(i.value) || 0);
-            
-            const totals = [0, 1, 2, 3].map(p => {
-                let sum = 0;
-                for(let r=0; r<8; r++) sum += (rawNumbers[r*8 + p*2] - rawNumbers[r*8 + p*2 + 1]);
-                return sum;
-            });
+    submitBtn.disabled = true;
+    submitBtn.innerText = "保存中...";
 
-            try {
-                const { error } = await supabase.from('games').insert({
-                    player_names: names,
-                    scores: totals,
-                    raw_data: { grid: rawNumbers }
-                });
-                if (error) throw error;
-                alert("クラウド保存に成功しました！");
-                modal.style.display = 'none';
-                // --- submitBtn.onclick の try ブロック内、insert成功のすぐ後あたり ---
+    const names = Array.from(playerInputsArea.querySelectorAll('input')).map(i => i.value || '未設定');
+    const scoreInputs = document.querySelectorAll('#gridBody input');
+    const rawNumbers = Array.from(scoreInputs).map(i => parseInt(i.value) || 0);
 
-// 1. 入力された名前から「未設定」を除外してリスト化
-const newPlayers = names.filter(n => n !== '未設定').map(n => ({ name: n }));
+    // 1. 各プレイヤーの最終合計スコアを算出
+    const finalScores = [0, 1, 2, 3].map(p => {
+        let sum = 0;
+        for (let r = 0; r < 8; r++) sum += (rawNumbers[r * 8 + p * 2] - rawNumbers[r * 8 + p * 2 + 1]);
+        return sum;
+    });
 
-// 2. playersテーブルに保存（既存の名前がある場合は何もしない）
-if (newPlayers.length > 0) {
-    await supabase.from('players').upsert(newPlayers, { onConflict: 'name' });
-}
+    // 2. 着順（Rank）を計算する（スコアが高い順）
+    // スコアと元のインデックスをセットにしてソート
+    const sorted = finalScores
+        .map((s, i) => ({ score: s, index: i }))
+        .sort((a, b) => b.score - a.score);
+    
+    const ranks = new Array(4);
+    sorted.forEach((item, i) => {
+        ranks[item.index] = i + 1; // 1位〜4位
+    });
 
-// 3. 次回の入力のために候補リストを更新
-updatePlayerSuggestions(); 
+    try {
+        // --- 手順A: プレイヤー名簿の更新（前回同様） ---
+        const newPlayers = names.filter(n => n !== '未設定').map(n => ({ name: n }));
+        if (newPlayers.length > 0) {
+            await supabase.from('players').upsert(newPlayers, { onConflict: 'name' });
+        }
+        
+        // 最新のplayer_idを取得するためにplayersテーブルを再参照
+        const { data: playerData } = await supabase.from('players').select('id, name').in('name', names);
 
-            } catch (err) {
-                alert("エラー: " + err.message);
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.innerText = "DBに保存";
-            }
-        };
+        // --- 手順B: gamesテーブルへ保存（詳細データ込） ---
+        const { data: gameData, error: gameError } = await supabase.from('games').insert({
+            player_names: names,
+            scores: finalScores,
+            raw_data: { grid: rawNumbers }, // 互換性のため残す
+            raw_data_full: { grid: rawNumbers } // 詳細再現用
+        }).select().single();
+
+        if (gameError) throw gameError;
+
+        // --- 手順C: game_results（明細）へ4人分一括保存 ---
+        const resultsData = names.map((name, i) => {
+            const pObj = playerData.find(pd => pd.name === name);
+            return {
+                game_id: gameData.id,
+                player_id: pObj ? pObj.id : null,
+                player_name: name,
+                score: finalScores[i],
+                rank: ranks[i]
+            };
+        });
+
+        const { error: resError } = await supabase.from('game_results').insert(resultsData);
+        if (resError) throw resError;
+
+        alert("プロ級のデータ保存に成功しました！");
+        modal.style.display = 'none';
+        updatePlayerSuggestions(); // 候補リスト更新
+
+    } catch (err) {
+        alert("エラー: " + err.message);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = "DBに保存";
+    }
+};
+
     };
     initCloud();
 });

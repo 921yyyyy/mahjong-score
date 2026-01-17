@@ -1,5 +1,5 @@
 const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
-const SUPABASE_KEY = 'ここに成功した長いanonキーを貼り付け';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function loadHistory() {

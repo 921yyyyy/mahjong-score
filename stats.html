@@ -17,6 +17,7 @@
         .gridjs-container { padding: 0; color: #1e293b; }
         .gridjs-wrapper { border-radius: 0; border: none; }
         
+        /* ヘッダー: ネイビー背景 */
         .gridjs-th {
             background-color: #041e42 !important;
             color: #ffffff !important;
@@ -26,6 +27,16 @@
             padding: 15px 10px !important;
         }
 
+        /* 並べ替え矢印を白くする */
+        .gridjs-sort { background-color: transparent !important; }
+        button.gridjs-sort-neutral, 
+        button.gridjs-sort-asc, 
+        button.gridjs-sort-desc {
+            filter: brightness(0) invert(1);
+            opacity: 0.8;
+        }
+
+        /* セル設定 */
         .gridjs-td {
             background-color: #ffffff !important;
             color: #1e293b !important;
@@ -36,7 +47,10 @@
         }
 
         .gridjs-tr:nth-child(odd) .gridjs-td { background-color: #f8fafc !important; }
-        .gridjs-td:last-child { color: #f97316 !important; } /* PTS列をオレンジに */
+
+        /* PTSの色分けクラス */
+        .pts-positive { color: #1d4ed8 !important; } /* MLBブルー */
+        .pts-negative { color: #be123c !important; } /* MLBレッド */
 
         .gridjs-search-input {
             background-color: #1e293b !important;
@@ -46,7 +60,6 @@
             font-size: 12px !important;
         }
         
-        /* 読み込み中メッセージのスタイル */
         #mlb-grid-container:empty::before {
             content: "LOADING STATS...";
             display: block;
@@ -106,14 +119,18 @@
 
                 const tableData = Object.values(stats)
                     .sort((a, b) => b.pts - a.pts)
-                    .map(p => [
-                        p.name, 
-                        p.g, 
-                        (p.sumR / p.g).toFixed(2), 
-                        p.pts > 0 ? `+${p.pts}` : p.pts
-                    ]);
+                    .map(p => {
+                        const ptsValue = p.pts > 0 ? `+${p.pts}` : p.pts;
+                        const ptsClass = p.pts > 0 ? 'pts-positive' : (p.pts < 0 ? 'pts-negative' : '');
+                        
+                        return [
+                            p.name, 
+                            p.g, 
+                            (p.sumR / p.g).toFixed(2), 
+                            gridjs.html(`<span class="${ptsClass}">${ptsValue}</span>`)
+                        ];
+                    });
 
-                // 描画実行
                 new gridjs.Grid({
                     columns: ["PLAYER", "G", "AVG", "PTS"],
                     data: tableData,

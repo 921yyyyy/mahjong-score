@@ -81,85 +81,94 @@
     <script src="navbar.js"></script>
 
         <script>
-        const S_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
-        const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
-        const sb = window.supabase.createClient(S_URL, S_KEY);
+    const S_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
+    const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
+    const sb = window.supabase.createClient(S_URL, S_KEY);
 
-        async function loadStats(mode) {
-            const container = document.getElementById('mlb-grid-container');
-            container.innerHTML = "<div class='p-10 text-center text-slate-400 font-bold animate-pulse'>LOADING...</div>";
+    async function loadStats(mode) {
+        const container = document.getElementById('mlb-grid-container');
+        container.innerHTML = "<div class='p-10 text-center text-slate-400 font-bold animate-pulse'>LOADING " + mode.toUpperCase() + "...</div>";
 
-            try {
-                const table = mode === 'match' ? 'game_results' : 'set_summaries';
-                const { data, error } = await sb.from(table).select('*');
-                
-                if (error) throw error;
-                if (!data || data.length === 0) {
-                    container.innerHTML = `<div class='p-10 text-center text-slate-400'>NO DATA FOUND IN ${table.toUpperCase()}</div>`;
-                    return;
-                }
+        try {
+            const table = mode === 'match' ? 'game_results' : 'set_summaries';
+            
+            // 【対策1】キャッシュを回避するためにクエリにタイムスタンプを付与
+            const { data, error } = await sb
+                .from(table)
+                .select('*')
+                .set('ts', new Date().getTime()); // これで毎回新しいリクエストにする
 
-                const stats = {};
-                data.forEach(r => {
-                    const n = r.player_name || 'Unknown';
-                    // モードによって取得するカラムを切り替え
-                    const rk = mode === 'match' ? Number(r.rank || 0) : Number(r.final_rank || 0);
-                    const sc = mode === 'match' ? Number(r.score || 0) : Number(r.total_score || 0);
-                    
-                    if(!stats[n]) stats[n] = { n, g:0, sumR:0, pts:0, f:0, s:0, l:0, mx:-999 };
-                    stats[n].g++;
-                    stats[n].sumR += rk;
-                    stats[n].pts += sc;
-                    if(rk===1) stats[n].f++;
-                    if(rk===2) stats[n].s++;
-                    if(rk===4) stats[n].l++;
-                    if(sc > stats[n].mx) stats[n].mx = sc;
-                });
-
-                const tableData = Object.values(stats).sort((a,b) => b.pts - a.pts).map(p => {
-                    const pC = p.pts > 0 ? 'pts-positive' : (p.pts < 0 ? 'pts-negative' : '');
-                    const pV = p.pts > 0 ? '+'+p.pts : p.pts;
-                    return [
-                        p.n, 
-                        p.g, 
-                        (p.sumR/p.g).toFixed(2), 
-                        p.f, 
-                        ((p.f/p.g)*100).toFixed(1)+'%', 
-                        (((p.f+p.s)/p.g)*100).toFixed(1)+'%',
-                        ((1-(p.l/p.g))*100).toFixed(1)+'%',
-                        p.mx,
-                        gridjs.html(`<span class="${pC}">${pV}</span>`)
-                    ];
-                });
-
-                const cols = mode === 'match' 
-                    ? ["PLAYER", "G", "AVG", "1ST", "TOP%", "REN%", "L-ESC%", "MAX", "PTS"]
-                    : ["PLAYER", "S-G", "S-AVG", "S-1ST", "S-TOP%", "S-REN%", "S-ESC%", "S-MAX", "S-PTS"];
-
-                container.innerHTML = ''; 
-                new gridjs.Grid({
-                    columns: cols,
-                    data: tableData,
-                    sort: true,
-                    search: true,
-                    fixedHeader: true,
-                    style: { table: { 'min-width': '650px' } },
-                    language: { 'search': { 'placeholder': '選手名検索...' } }
-                }).render(container);
-
-            } catch (e) {
-                container.innerHTML = "<div class='p-10 text-red-500 font-bold'>ERROR: " + e.message + "</div>";
+            if (error) throw error;
+            
+            // データが空の場合のガード
+            if (!data || data.length === 0) {
+                container.innerHTML = `<div class='p-10 text-center text-slate-400'>NO DATA IN ${table.toUpperCase()}</div>`;
+                return;
             }
+
+            const stats = {};
+            data.forEach(r => {
+                const n = r.player_name || 'Unknown';
+                // 【対策2】カラム名の参照をより厳密に
+                let rk, sc;
+                if (mode === 'match') {
+                    rk = Number(r.rank || 0);
+                    sc = Number(r.score || 0);
+                } else {
+                    rk = Number(r.final_rank || 0);
+                    sc = Number(r.total_score || 0);
+                }
+                
+                if(!stats[n]) stats[n] = { n, g:0, sumR:0, pts:0, f:0, s:0, l:0, mx:-999 };
+                stats[n].g++;
+                stats[n].sumR += rk;
+                stats[n].pts += sc;
+                if(rk===1) stats[n].f++;
+                if(rk===2) stats[n].s++;
+                if(rk===4) stats[n].l++;
+                if(sc > stats[n].mx) stats[n].mx = sc;
+            });
+
+            const tableData = Object.values(stats).sort((a,b) => b.pts - a.pts).map(p => {
+                const pC = p.pts > 0 ? 'pts-positive' : (p.pts < 0 ? 'pts-negative' : '');
+                const pV = p.pts > 0 ? '+'+p.pts : p.pts;
+                return [
+                    p.n, p.g, (p.sumR/p.g).toFixed(2), p.f, 
+                    ((p.f/p.g)*100).toFixed(1)+'%', 
+                    (((p.f+p.s)/p.g)*100).toFixed(1)+'%',
+                    ((1-(p.l/p.g))*100).toFixed(1)+'%',
+                    p.mx,
+                    gridjs.html(`<span class="${pC}">${pV}</span>`)
+                ];
+            });
+
+            const cols = mode === 'match' 
+                ? ["PLAYER", "G", "AVG", "1ST", "TOP%", "REN%", "L-ESC%", "MAX", "PTS"]
+                : ["PLAYER", "S-G", "S-AVG", "S-1ST", "S-TOP%", "S-REN%", "S-ESC%", "S-MAX", "S-PTS"];
+
+            container.innerHTML = ''; 
+            new gridjs.Grid({
+                columns: cols,
+                data: tableData,
+                sort: true,
+                search: true,
+                fixedHeader: true,
+                style: { table: { 'min-width': '650px' } },
+                language: { 'search': { 'placeholder': '選手名検索...' } }
+            }).render(container);
+
+        } catch (e) {
+            container.innerHTML = "<div class='p-10 text-red-500 font-bold'>ERROR: " + e.message + "</div>";
         }
+    }
 
-        window.changeTab = function(mode) {
-            document.getElementById('btn-match').classList.toggle('active', mode === 'match');
-            document.getElementById('btn-session').classList.toggle('active', mode === 'session');
-            loadStats(mode);
-        };
+    window.changeTab = function(mode) {
+        document.getElementById('btn-match').classList.toggle('active', mode === 'match');
+        document.getElementById('btn-session').classList.toggle('active', mode === 'session');
+        loadStats(mode);
+    };
 
-        window.onload = () => loadStats('match');
-    </script>
-
+    window.onload = () => loadStats('match');
+</script>
 </body>
 </html>

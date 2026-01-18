@@ -3,77 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LEAGUE STATS</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <title>STATS | Professional Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/gridjs/dist/gridjs.umd.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { background-color: #070d1c; color: #f1f5f9; font-family: 'Inter', sans-serif; }
+        
+        /* MLB風カスタマイズ: Grid.jsの見た目を上書き */
+        .gridjs-container { padding: 0; }
+        .gridjs-wrapper { border-radius: 0; border: none; box-shadow: none; }
+        
+        /* ヘッダー: MLBネイビー */
+        .gridjs-th {
+            background-color: #041e42 !important;
+            color: #ffffff !important;
+            text-transform: uppercase;
+            font-size: 10px !important;
+            letter-spacing: 0.1em;
+            border: none !important;
+            padding: 15px 10px !important;
+        }
+
+        /* セル: 視認性の高い太字 */
+        .gridjs-td {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+            font-weight: 800 !important;
+            font-size: 13px !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            padding: 16px 10px !important;
+        }
+
+        /* 奇数行の背景を薄いグレーに（ゼブラ柄） */
+        .gridjs-tr:nth-child(odd) .gridjs-td {
+            background-color: #f8fafc !important;
+        }
+
+        /* 数値のカラムを強調 */
+        .gridjs-td:nth-child(4) { color: #f97316 !important; } /* PTSはオレンジ */
+
+        /* 検索バーをMLB風に */
+        .gridjs-search-input {
+            background-color: #1e293b !important;
+            border: 1px solid #334155 !important;
+            color: white !important;
+            border-radius: 8px !important;
+            font-size: 12px !important;
+        }
+    </style>
 </head>
-<body class="bg-slate-50 p-4">
-    <div class="max-w-md mx-auto space-y-6">
-        <header class="flex justify-between items-center py-4">
-            <h1 class="text-xl font-black italic text-blue-900 italic">LEAGUE STATS</h1>
-            <a href="index.html" class="text-[10px] font-bold text-slate-400 border border-slate-300 px-3 py-1 rounded-full">← BACK</a>
+<body class="p-0 pb-24">
+    <div class="max-w-xl mx-auto">
+        <header class="p-6 bg-gradient-to-b from-[#041e42] to-[#070d1c] border-b border-orange-500/30 mb-2">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-black italic tracking-tighter text-white">PLAYER STATS</h1>
+                    <p class="text-[10px] font-bold text-orange-400 tracking-widest uppercase">2026 Season Analysis</p>
+                </div>
+                <div class="text-right">
+                    <span class="block text-[10px] text-slate-400 font-bold uppercase">Division</span>
+                    <span class="text-sm font-black text-white italic">MAHJONG PRO</span>
+                </div>
+            </div>
         </header>
 
-        <div id="status" class="text-[10px] text-center text-slate-400 font-mono">Connecting...</div>
-        
-        <div id="grid-wrapper" class="bg-white rounded-xl shadow-sm overflow-hidden"></div>
+        <div id="mlb-grid-container" class="bg-white"></div>
     </div>
+
+    <script src="navbar.js"></script>
 
     <script>
         const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        async function init() {
-            const statusEl = document.getElementById('status');
-            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
+        async function renderRanking() {
+            const container = document.getElementById('mlb-grid-container');
+            
             try {
-                // 1. データの取得
                 const { data, error } = await supabase.from('game_results').select('*');
                 if (error) throw error;
 
-                // 2. データの集計（プレイヤーごと）
                 const stats = {};
                 data.forEach(row => {
-                    const name = row.player_name;
+                    const name = row.player_name || 'Unknown';
                     if (!stats[name]) stats[name] = { name, g: 0, sumR: 0, pts: 0 };
                     stats[name].g++;
-                    stats[name].sumR += Number(row.rank);
-                    stats[name].pts += Number(row.score);
+                    stats[name].sumR += Number(row.rank || 0);
+                    stats[name].pts += Number(row.score || 0);
                 });
 
-                // 3. Grid.js用の形式に変換
-                const tableData = Object.values(stats).map(p => [
-                    p.name,
-                    p.g,
-                    (p.sumR / p.g).toFixed(2),
-                    p.pts > 0 ? `+${p.pts}` : p.pts
-                ]);
+                const tableData = Object.values(stats)
+                    .sort((a, b) => b.pts - a.pts) // 最初から得点順に並べる
+                    .map(p => [
+                        p.name, 
+                        p.g, 
+                        (p.sumR / p.g).toFixed(2), 
+                        p.pts > 0 ? `+${p.pts}` : p.pts
+                    ]);
 
-                // 4. 表の描画
                 new gridjs.Grid({
-                    columns: ["PLAYER", "G", "AVG", "PTS"],
+                    columns: [
+                        { name: "PLAYER", sort: true },
+                        { name: "G", sort: true },
+                        { name: "AVG", sort: true },
+                        { name: "PTS", sort: true }
+                    ],
                     data: tableData,
-                    sort: true,
+                    search: true, // 選手検索機能を追加
                     style: {
-                        table: { 'font-size': '12px' },
-                        th: { 'background-color': '#1e293b', 'color': '#fff', 'text-align': 'center' },
-                        td: { 'text-align': 'center' }
+                        table: { 'width': '100%' }
+                    },
+                    language: {
+                        'search': { 'placeholder': '選手名で検索...' }
                     }
-                }).render(document.getElementById('grid-wrapper'));
-
-                statusEl.innerText = `Updated: ${new Date().toLocaleTimeString()}`;
+                }).render(container);
 
             } catch (err) {
-                statusEl.innerText = "Error: " + err.message;
-                statusEl.style.color = "red";
+                container.innerHTML = `<div class='p-10 text-red-500 text-center font-bold'>${err.message}</div>`;
             }
         }
 
-        window.onload = init;
+        renderRanking();
     </script>
-        <script src="navbar.js"></script>
 </body>
 </html>

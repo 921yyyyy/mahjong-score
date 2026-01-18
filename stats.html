@@ -13,7 +13,6 @@
         .gridjs-container { padding: 0; color: #1e293b; }
         .gridjs-wrapper { border-radius: 0; border: none; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
 
-        /* デザイン統一設定 */
         .gridjs-th {
             background-color: #041e42 !important; color: #ffffff !important;
             text-transform: uppercase; font-size: 9px !important;
@@ -21,7 +20,6 @@
             min-width: 70px;
         }
 
-        /* 1列目(PLAYER)固定 & 不透明化 */
         .gridjs-td:first-child {
             position: sticky !important; left: 0; z-index: 2;
             background-color: #ffffff !important; min-width: 90px !important;
@@ -41,21 +39,14 @@
         }
         .gridjs-tr:nth-child(odd) .gridjs-td { background-color: #f8fafc !important; }
         
-        /* 矢印・検索・PTS色分け */
         .gridjs-sort { background-color: transparent !important; }
         button.gridjs-sort-neutral, button.gridjs-sort-asc, button.gridjs-sort-desc { filter: brightness(0) invert(1); opacity: 0.8; }
         .pts-positive { color: #1d4ed8 !important; }
         .pts-negative { color: #be123c !important; }
         .gridjs-search-input { background-color: #1e293b !important; border: 1px solid #334155 !important; color: white !important; border-radius: 8px !important; }
 
-        /* タブスイッチのMLB風デザイン */
-        .tab-button {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-        }
-        .tab-button.active {
-            color: #f97316;
-        }
+        .tab-button { transition: all 0.3s ease; position: relative; opacity: 0.5; }
+        .tab-button.active { color: #f97316; opacity: 1; }
         .tab-button.active::after {
             content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
             width: 20px; height: 3px; background: #f97316; border-radius: 2px;
@@ -77,8 +68,8 @@
             </div>
 
             <div class="flex space-x-8">
-                <button onclick="switchTab('match')" id="btn-match" class="tab-button active text-xs font-black uppercase tracking-widest">Match</button>
-                <button onclick="switchTab('session')" id="btn-session" class="tab-button text-xs font-black uppercase tracking-widest text-slate-500">Session</button>
+                <button id="btn-match" class="tab-button active text-xs font-black uppercase tracking-widest">Match</button>
+                <button id="btn-session" class="tab-button text-xs font-black uppercase tracking-widest">Session</button>
             </div>
         </header>
 
@@ -92,60 +83,67 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         
-        let grid = null;
         let currentMode = 'match';
 
-        async function fetchData(mode) {
-            const tableName = mode === 'match' ? 'game_results' : 'set_summaries';
-            const { data, error } = await supabase.from(tableName).select('*');
-            if (error) throw error;
-            return data;
-        }
-
-        function processData(data, mode) {
-            const stats = {};
-            data.forEach(row => {
-                const name = row.player_name || 'Unknown';
-                const rank = mode === 'match' ? Number(row.rank || 0) : Number(row.final_rank || 0);
-                const score = mode === 'match' ? Number(row.score || 0) : Number(row.total_score || 0);
-                
-                if (!stats[name]) {
-                    stats[name] = { name, g: 0, sumR: 0, pts: 0, first: 0, second: 0, last: 0, max: -999 };
-                }
-                stats[name].g++;
-                stats[name].sumR += rank;
-                stats[name].pts += score;
-                if (rank === 1) stats[name].first++;
-                if (rank === 2) stats[name].second++;
-                if (rank === 4) stats[name].last++;
-                if (score > stats[name].max) stats[name].max = score;
-            });
-
-            return Object.values(stats).sort((a, b) => b.pts - a.pts).map(p => {
-                const topRate = ((p.first / p.g) * 100).toFixed(1) + '%';
-                const renRate = (((p.first + p.second) / p.g) * 100).toFixed(1) + '%';
-                const lastEsc = ((1 - (p.last / p.g)) * 100).toFixed(1) + '%';
-                const ptsClass = p.pts > 0 ? 'pts-positive' : (p.pts < 0 ? 'pts-negative' : '');
-                return [
-                    p.name, p.g, (p.sumR / p.g).toFixed(2), 
-                    p.first, topRate, renRate, lastEsc, p.max,
-                    gridjs.html(`<span class="${ptsClass}">${p.pts > 0 ? '+' + p.pts : p.pts}</span>`)
-                ];
-            });
+        async function init() {
+            // イベントリスナーの登録
+            document.getElementById('btn-match').addEventListener('click', () => switchTab('match'));
+            document.getElementById('btn-session').addEventListener('click', () => switchTab('session'));
+            
+            // 初回描画
+            renderGrid('match');
         }
 
         async function renderGrid(mode) {
             const container = document.getElementById('mlb-grid-container');
-            container.innerHTML = ''; // クリア
+            container.innerHTML = "<div class='p-10 text-slate-400 text-center text-xs uppercase font-bold animate-pulse'>Loading Data...</div>";
             
             try {
-                const data = await fetchData(mode);
-                const tableData = processData(data, mode);
+                const tableName = mode === 'match' ? 'game_results' : 'set_summaries';
+                const { data, error } = await supabase.from(tableName).select('*');
+                
+                if (error) throw error;
+                if (!data || data.length === 0) {
+                    container.innerHTML = "<div class='p-10 text-slate-400 text-center text-xs uppercase font-bold'>No Data Found</div>";
+                    return;
+                }
+
+                const stats = {};
+                data.forEach(row => {
+                    const name = row.player_name || 'Unknown';
+                    const rank = mode === 'match' ? Number(row.rank || 0) : Number(row.final_rank || 0);
+                    const score = mode === 'match' ? Number(row.score || 0) : Number(row.total_score || 0);
+                    
+                    if (!stats[name]) {
+                        stats[name] = { name, g: 0, sumR: 0, pts: 0, first: 0, second: 0, last: 0, max: -999 };
+                    }
+                    stats[name].g++;
+                    stats[name].sumR += rank;
+                    stats[name].pts += score;
+                    if (rank === 1) stats[name].first++;
+                    if (rank === 2) stats[name].second++;
+                    if (rank === 4) stats[name].last++;
+                    if (score > stats[name].max) stats[name].max = score;
+                });
+
+                const tableData = Object.values(stats).sort((a, b) => b.pts - a.pts).map(p => {
+                    const topRate = ((p.first / p.g) * 100).toFixed(1) + '%';
+                    const renRate = (((p.first + p.second) / p.g) * 100).toFixed(1) + '%';
+                    const lastEsc = ((1 - (p.last / p.g)) * 100).toFixed(1) + '%';
+                    const ptsClass = p.pts > 0 ? 'pts-positive' : (p.pts < 0 ? 'pts-negative' : '');
+                    return [
+                        p.name, p.g, (p.sumR / p.g).toFixed(2), 
+                        p.first, topRate, renRate, lastEsc, p.max,
+                        gridjs.html(`<span class="${ptsClass}">${p.pts > 0 ? '+' + p.pts : p.pts}</span>`)
+                    ];
+                });
+
                 const columns = mode === 'match' 
                     ? ["PLAYER", "G", "AVG", "1ST", "TOP%", "REN%", "L-ESC%", "MAX", "PTS"]
                     : ["PLAYER", "S-G", "S-AVG", "S-1ST", "S-TOP%", "S-REN%", "S-ESC%", "S-MAX", "S-PTS"];
 
-                grid = new gridjs.Grid({
+                container.innerHTML = ''; // クリアして描画
+                new gridjs.Grid({
                     columns: columns,
                     data: tableData,
                     sort: true,
@@ -154,7 +152,9 @@
                     style: { table: { 'min-width': '650px' } },
                     language: { 'search': { 'placeholder': '選手名検索...' } }
                 }).render(container);
+
             } catch (err) {
+                console.error(err);
                 container.innerHTML = `<div class='p-10 text-red-500 text-center font-bold'>ERROR: ${err.message}</div>`;
             }
         }
@@ -163,11 +163,9 @@
             if (currentMode === mode) return;
             currentMode = mode;
 
-            // UI更新
+            // ボタンの状態更新
             document.getElementById('btn-match').classList.toggle('active', mode === 'match');
-            document.getElementById('btn-match').classList.toggle('text-slate-500', mode !== 'match');
             document.getElementById('btn-session').classList.toggle('active', mode === 'session');
-            document.getElementById('btn-session').classList.toggle('text-slate-500', mode !== 'session');
             
             const label = document.getElementById('stat-type-label');
             label.innerText = mode === 'match' ? 'Match Stats (Single)' : 'Session Stats (Daily Summary)';
@@ -175,7 +173,8 @@
             renderGrid(mode);
         }
 
-        document.addEventListener('DOMContentLoaded', () => renderGrid('match'));
+        // 実行
+        init();
     </script>
 </body>
 </html>

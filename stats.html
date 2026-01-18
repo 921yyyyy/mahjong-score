@@ -11,12 +11,12 @@
     <style>
         body { background-color: #070d1c; color: #f1f5f9; font-family: 'Inter', sans-serif; }
         .gridjs-container { padding: 0; color: #1e293b; }
-        .gridjs-wrapper { border-radius: 0; border: none; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+        .gridjs-wrapper { border-radius: 0; border: none; overflow-x: auto !important; }
 
         .gridjs-th {
             background-color: #041e42 !important; color: #ffffff !important;
             text-transform: uppercase; font-size: 9px !important;
-            letter-spacing: 0.05em; padding: 12px 5px !important; text-align: center !important;
+            padding: 12px 5px !important; text-align: center !important;
             min-width: 70px;
         }
 
@@ -45,7 +45,7 @@
         .pts-negative { color: #be123c !important; }
         .gridjs-search-input { background-color: #1e293b !important; border: 1px solid #334155 !important; color: white !important; border-radius: 8px !important; }
 
-        .tab-button { transition: all 0.3s ease; position: relative; opacity: 0.5; }
+        .tab-button { transition: all 0.3s ease; position: relative; opacity: 0.4; }
         .tab-button.active { color: #f97316; opacity: 1; }
         .tab-button.active::after {
             content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
@@ -60,10 +60,6 @@
                 <div>
                     <h1 class="text-2xl font-black italic tracking-tighter text-white uppercase leading-none">Analysis Center</h1>
                     <p id="stat-type-label" class="text-[10px] font-bold text-orange-400 tracking-widest uppercase mt-1">Match Stats (Single)</p>
-                </div>
-                <div class="text-right">
-                    <span class="block text-[10px] text-slate-400 font-bold uppercase">Division</span>
-                    <span class="text-sm font-black text-white italic">PRO LEAGUE</span>
                 </div>
             </div>
 
@@ -83,20 +79,43 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         
-        let currentMode = 'match';
+        let grid = null;
 
-        async function init() {
-            // イベントリスナーの登録
-            document.getElementById('btn-match').addEventListener('click', () => switchTab('match'));
-            document.getElementById('btn-session').addEventListener('click', () => switchTab('session'));
-            
-            // 初回描画
-            renderGrid('match');
+        // 集計ロジックを分離
+        function processRawData(data, mode) {
+            const stats = {};
+            data.forEach(row => {
+                const name = row.player_name || 'Unknown';
+                const rank = mode === 'match' ? Number(row.rank || 0) : Number(row.final_rank || 0);
+                const score = mode === 'match' ? Number(row.score || 0) : Number(row.total_score || 0);
+                
+                if (!stats[name]) {
+                    stats[name] = { name, g: 0, sumR: 0, pts: 0, first: 0, second: 0, last: 0, max: -999 };
+                }
+                stats[name].g++;
+                stats[name].sumR += rank;
+                stats[name].pts += score;
+                if (rank === 1) stats[name].first++;
+                if (rank === 2) stats[name].second++;
+                if (rank === 4) stats[name].last++;
+                if (score > stats[name].max) stats[name].max = score;
+            });
+
+            return Object.values(stats).sort((a, b) => b.pts - a.pts).map(p => {
+                const topRate = ((p.first / p.g) * 100).toFixed(1) + '%';
+                const renRate = (((p.first + p.second) / p.g) * 100).toFixed(1) + '%';
+                const lastEsc = ((1 - (p.last / p.g)) * 100).toFixed(1) + '%';
+                const ptsClass = p.pts > 0 ? 'pts-positive' : (p.pts < 0 ? 'pts-negative' : '');
+                return [
+                    p.name, p.g, (p.sumR / p.g).toFixed(2), 
+                    p.first, topRate, renRate, lastEsc, p.max,
+                    gridjs.html(`<span class="${ptsClass}">${p.pts > 0 ? '+' + p.pts : p.pts}</span>`)
+                ];
+            });
         }
 
-        async function renderGrid(mode) {
+        async function loadAndRender(mode) {
             const container = document.getElementById('mlb-grid-container');
-            container.innerHTML = "<div class='p-10 text-slate-400 text-center text-xs uppercase font-bold animate-pulse'>Loading Data...</div>";
             
             try {
                 const tableName = mode === 'match' ? 'game_results' : 'set_summaries';
@@ -104,45 +123,17 @@
                 
                 if (error) throw error;
                 if (!data || data.length === 0) {
-                    container.innerHTML = "<div class='p-10 text-slate-400 text-center text-xs uppercase font-bold'>No Data Found</div>";
+                    container.innerHTML = `<div class='p-10 text-slate-400 text-center font-bold'>NO DATA IN ${tableName.toUpperCase()}</div>`;
                     return;
                 }
 
-                const stats = {};
-                data.forEach(row => {
-                    const name = row.player_name || 'Unknown';
-                    const rank = mode === 'match' ? Number(row.rank || 0) : Number(row.final_rank || 0);
-                    const score = mode === 'match' ? Number(row.score || 0) : Number(row.total_score || 0);
-                    
-                    if (!stats[name]) {
-                        stats[name] = { name, g: 0, sumR: 0, pts: 0, first: 0, second: 0, last: 0, max: -999 };
-                    }
-                    stats[name].g++;
-                    stats[name].sumR += rank;
-                    stats[name].pts += score;
-                    if (rank === 1) stats[name].first++;
-                    if (rank === 2) stats[name].second++;
-                    if (rank === 4) stats[name].last++;
-                    if (score > stats[name].max) stats[name].max = score;
-                });
-
-                const tableData = Object.values(stats).sort((a, b) => b.pts - a.pts).map(p => {
-                    const topRate = ((p.first / p.g) * 100).toFixed(1) + '%';
-                    const renRate = (((p.first + p.second) / p.g) * 100).toFixed(1) + '%';
-                    const lastEsc = ((1 - (p.last / p.g)) * 100).toFixed(1) + '%';
-                    const ptsClass = p.pts > 0 ? 'pts-positive' : (p.pts < 0 ? 'pts-negative' : '');
-                    return [
-                        p.name, p.g, (p.sumR / p.g).toFixed(2), 
-                        p.first, topRate, renRate, lastEsc, p.max,
-                        gridjs.html(`<span class="${ptsClass}">${p.pts > 0 ? '+' + p.pts : p.pts}</span>`)
-                    ];
-                });
-
+                const tableData = processRawData(data, mode);
                 const columns = mode === 'match' 
                     ? ["PLAYER", "G", "AVG", "1ST", "TOP%", "REN%", "L-ESC%", "MAX", "PTS"]
                     : ["PLAYER", "S-G", "S-AVG", "S-1ST", "S-TOP%", "S-REN%", "S-ESC%", "S-MAX", "S-PTS"];
 
-                container.innerHTML = ''; // クリアして描画
+                container.innerHTML = ''; // 確実に初期化
+                
                 new gridjs.Grid({
                     columns: columns,
                     data: tableData,
@@ -154,27 +145,30 @@
                 }).render(container);
 
             } catch (err) {
-                console.error(err);
-                container.innerHTML = `<div class='p-10 text-red-500 text-center font-bold'>ERROR: ${err.message}</div>`;
+                container.innerHTML = `<div class='p-10 text-red-500 text-center font-bold'>DB ERROR: ${err.message}</div>`;
             }
         }
 
-        function switchTab(mode) {
-            if (currentMode === mode) return;
-            currentMode = mode;
+        // DOMContentLoaded で確実に実行
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAndRender('match');
 
-            // ボタンの状態更新
+            document.getElementById('btn-match').addEventListener('click', function() {
+                updateUI('match');
+                loadAndRender('match');
+            });
+
+            document.getElementById('btn-session').addEventListener('click', function() {
+                updateUI('session');
+                loadAndRender('session');
+            });
+        });
+
+        function updateUI(mode) {
             document.getElementById('btn-match').classList.toggle('active', mode === 'match');
             document.getElementById('btn-session').classList.toggle('active', mode === 'session');
-            
-            const label = document.getElementById('stat-type-label');
-            label.innerText = mode === 'match' ? 'Match Stats (Single)' : 'Session Stats (Daily Summary)';
-
-            renderGrid(mode);
+            document.getElementById('stat-type-label').innerText = mode === 'match' ? 'Match Stats (Single)' : 'Session Stats (Daily Summary)';
         }
-
-        // 実行する
-        init();
     </script>
 </body>
 </html>

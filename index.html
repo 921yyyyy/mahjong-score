@@ -22,6 +22,9 @@
         .input-plus { background-color: #eff6ff !important; color: #1d4ed8; } /* プラスは青系 */
         .input-minus { background-color: #fff1f2 !important; color: #be123c; } /* マイナスは赤系 */
     </style>
+        <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gridjs/dist/gridjs.umd.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
 </head>
 <body class="p-2 sm:p-4 pb-24">
     <div class="max-w-xl mx-auto space-y-4">
@@ -95,6 +98,14 @@
                 <button id="saveData" class="w-full py-5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-xl transition-all active:scale-95">
             💾 結果をクラウドに保存
         </button>
+            <div class="flex justify-center space-x-2 my-4">
+        <button onclick="switchTab('input')" id="btn-input" class="px-6 py-2 rounded-full text-xs font-bold bg-blue-900 text-white">INPUT</button>
+        <button onclick="switchTab('stats')" id="btn-stats" class="px-6 py-2 rounded-full text-xs font-bold bg-slate-200 text-slate-600">STATS</button>
+    </div>
+
+    <div id="stats-section" class="hidden animate-in fade-in duration-300">
+        <div id="mlb-grid-container" class="bg-white rounded-xl shadow-sm overflow-hidden"></div>
+    </div>
     </div>
 
     <div id="cloudModal" style="display:none;" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm">

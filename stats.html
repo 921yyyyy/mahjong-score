@@ -22,46 +22,69 @@
         <div id="debug-status" class="text-[10px] text-slate-400 font-mono text-center">Loading Supabase Data...</div>
     </div>
 
-         <script>
-        // 1. 設定
+         <!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CONNECTION TEST</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body style="font-family: sans-serif; padding: 20px;">
+    <h2>Supabase 疎通確認</h2>
+    <div id="status" style="padding: 10px; background: #eee; border-radius: 5px;">
+        ライブラリを読み込み中...
+    </div>
+    <div id="data-view" style="margin-top: 20px; font-size: 12px; white-space: pre-wrap;"></div>
+
+    <script>
         const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        async function loadMlbStats() {
-            const statusEl = document.getElementById('debug-status');
-            const container = document.getElementById('mlb-grid-container');
-            
-            // ログの開始
-            statusEl.innerText = "Connecting to Supabase...";
+        async function startTest() {
+            const statusEl = document.getElementById('status');
+            const dataEl = document.getElementById('data-view');
+
+            // 2. ライブラリが正しく読み込まれたかチェック
+            if (!window.supabase) {
+                statusEl.innerText = "❌ エラー: Supabaseライブラリが読み込めません";
+                statusEl.style.color = "red";
+                return;
+            }
+
+            statusEl.innerText = "🔄 接続中...";
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
             try {
-                // game_results テーブルから取得を試みる
+                // 3. game_results テーブルへのアクセス
                 const { data, error } = await supabase
                     .from('game_results')
-                    .select('player_name, score, rank');
-                
-                if (error) throw error;
+                    .select('*')
+                    .limit(5);
 
-                if (!data || data.length === 0) {
-                    statusEl.innerText = "Success but 0 rows found.";
+                if (error) {
+                    statusEl.innerText = "❌ 通信エラー: " + error.message;
                     return;
                 }
 
-                // 【超重要】まずは表にせず、生データをそのまま画面に出す
-                statusEl.innerText = `Success! Fetched ${data.length} rows.`;
-                container.innerHTML = `<pre class="text-[10px] bg-slate-100 p-2 overflow-auto max-h-64">${JSON.stringify(data, null, 2)}</pre>`;
+                if (data && data.length > 0) {
+                    statusEl.innerText = "✅ 成功！データが届きました。";
+                    statusEl.style.background = "#d1fae5";
+                    dataEl.innerText = JSON.stringify(data, null, 2);
+                } else {
+                    statusEl.innerText = "⚠️ 接続成功しましたが、データが0件です。";
+                }
 
             } catch (err) {
-                // エラーを緊急表示
-                statusEl.style.color = "red";
-                statusEl.innerText = "Error: " + err.message;
-                console.error(err);
+                statusEl.innerText = "❌ システムエラー: " + err.message;
             }
         }
 
-        // 実行
-        window.onload = loadMlbStats;
+        // ライブラリの読み込み完了を待ってから実行
+        window.onload = startTest;
     </script>
+</body>
+</html>
+
 </body>
 </html>

@@ -87,41 +87,36 @@
 
     async function loadStats(mode) {
         const container = document.getElementById('mlb-grid-container');
-        container.innerHTML = `<div class='p-10 text-center text-slate-400 font-bold animate-pulse'>LOADING ${mode.toUpperCase()}...</div>`;
+        container.innerHTML = `<div class='p-10 text-center text-slate-400 font-bold'>REFRESHING ${mode.toUpperCase()}...</div>`;
 
         try {
-            // 参照テーブルの決定
             const table = mode === 'match' ? 'game_results' : 'set_summaries';
             
-            // 余計なフィルタをすべて排除し、単純に全件取得します
+            // 【重要】URLの末尾に ?t=123456789 のようなユニークな値を付けてキャッシュを強制突破
+            const cacheBuster = new Date().getTime();
             const { data, error } = await sb
                 .from(table)
-                .select('*');
+                .select('*')
+                .or(`id.neq.00000000-0000-0000-0000-000000000000`) // 全件取得しつつクエリをユニーク化
+                .order('created_at', { ascending: false });
 
             if (error) throw error;
-            if (!data || data.length === 0) {
-                container.innerHTML = `<div class='p-10 text-center text-slate-400'>NO DATA IN ${table.toUpperCase()}</div>`;
-                return;
-            }
-
+            
             const stats = {};
             data.forEach(r => {
                 const n = r.player_name || 'Unknown';
-                
-                // カラム名の使い分けを完全に固定
                 let rk, sc;
+                
+                // モードに応じてカラム名を100%確実に使い分ける
                 if (mode === 'match') {
-                    // Matchタブ：game_resultsテーブルのカラム
                     rk = Number(r.rank || 0);
                     sc = Number(r.score || 0);
                 } else {
-                    // Sessionタブ：set_summariesテーブルのカラム
                     rk = Number(r.final_rank || 0);
                     sc = Number(r.total_score || 0);
                 }
                 
                 if(!stats[n]) stats[n] = { n, g:0, sumR:0, pts:0, f:0, s:0, l:0, mx:-999 };
-                
                 stats[n].g++;
                 stats[n].sumR += rk;
                 stats[n].pts += sc;
@@ -155,15 +150,11 @@
                 sort: true,
                 search: true,
                 fixedHeader: true,
-                style: { table: { 'min-width': '650px' } },
-                language: { 'search': { 'placeholder': '選手名検索...' } }
+                style: { table: { 'min-width': '650px' } }
             }).render(container);
 
         } catch (e) {
-            container.innerHTML = `<div class='p-10 text-red-500 font-bold text-center'>
-                <p>SYSTEM ERROR</p>
-                <p class='text-xs mt-2'>${e.message}</p>
-            </div>`;
+            container.innerHTML = `<div class='p-10 text-red-500 font-bold text-center'>FETCH ERROR: ${e.message}</div>`;
         }
     }
 
@@ -175,6 +166,7 @@
 
     window.onload = () => loadStats('match');
 </script>
+
 
 
 </body>

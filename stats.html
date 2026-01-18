@@ -75,7 +75,7 @@
 
             } catch (err) {
                 console.error(err);
-                statusEl.innerText = "Error: " + err.message;
+                statusEl.innerHTML = "Error: " + err.message + "<br>Detail: " + JSON.stringify(err);
                 statusEl.classList.add('text-red-500');
             }
         }

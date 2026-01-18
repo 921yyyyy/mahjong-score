@@ -11,7 +11,15 @@
     <style>
         body { background-color: #070d1c; color: #f1f5f9; font-family: 'Inter', sans-serif; }
         .gridjs-container { padding: 0; color: #1e293b; }
-        .gridjs-wrapper { border-radius: 0; border: none; }
+        
+        /* === 修正1: 横スクロールの最適化 === */
+        .gridjs-wrapper { 
+            border-radius: 0; 
+            border: none; 
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+        }
+
         .gridjs-th {
             background-color: #041e42 !important;
             color: #ffffff !important;
@@ -20,7 +28,21 @@
             letter-spacing: 0.05em;
             padding: 12px 5px !important;
             text-align: center !important;
+            min-width: 70px; /* 文字潰れ防止の最小幅 */
         }
+
+        /* === 修正2: PLAYER列の固定 === */
+        .gridjs-th:first-child,
+        .gridjs-td:first-child {
+            position: sticky !important;
+            left: 0;
+            z-index: 2;
+            background-color: inherit !important;
+            min-width: 90px !important;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        }
+        .gridjs-th:first-child { z-index: 3; }
+
         .gridjs-td {
             background-color: #ffffff !important;
             color: #1e293b !important;
@@ -31,6 +53,7 @@
             text-align: center !important;
         }
         .gridjs-tr:nth-child(odd) .gridjs-td { background-color: #f8fafc !important; }
+        
         /* 矢印を白く */
         .gridjs-sort { background-color: transparent !important; }
         button.gridjs-sort-neutral, button.gridjs-sort-asc, button.gridjs-sort-desc {
@@ -117,7 +140,10 @@
                     data: tableData,
                     sort: true,
                     search: true,
-                    style: { table: { 'width': '100%' } },
+                    fixedHeader: true, // ヘッダー固定を有効化
+                    style: { 
+                        table: { 'min-width': '650px' } // 横スクロールを発生させるための最小幅設定
+                    },
                     language: { 'search': { 'placeholder': '選手名検索...' } }
                 }).render(container);
 

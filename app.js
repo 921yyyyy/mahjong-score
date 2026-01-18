@@ -372,5 +372,72 @@ const updatePlayerSuggestions = async () => {
 
 
     };
+        // === タブ切り替え & ランキング表示機能 (統合版) ===
+    window.switchTab = async (tab) => {
+        // スキャナーに関連する全ての主要なUI要素
+        const scannerElements = document.querySelectorAll('.p-4, .p-5, .canvas-container, #debugLog, .rounded-xl.overflow-hidden, #saveData, header, .flex.justify-end');
+        const statsSection = document.getElementById('stats-section');
+        const btnInput = document.getElementById('btn-input');
+        const btnStats = document.getElementById('btn-stats');
+
+        if (tab === 'stats') {
+            scannerElements.forEach(el => el.classList.add('hidden'));
+            statsSection.classList.remove('hidden');
+            
+            // ボタンのスタイル切り替え
+            btnStats.className = "px-6 py-2 rounded-full text-[10px] font-bold bg-orange-500 text-white shadow-lg";
+            btnInput.className = "px-6 py-2 rounded-full text-[10px] font-bold bg-slate-700 text-slate-300";
+
+            renderRanking();
+        } else {
+            scannerElements.forEach(el => el.classList.remove('hidden'));
+            statsSection.classList.add('hidden');
+
+            btnInput.className = "px-6 py-2 rounded-full text-[10px] font-bold bg-orange-500 text-white shadow-lg";
+            btnStats.className = "px-6 py-2 rounded-full text-[10px] font-bold bg-slate-700 text-slate-300";
+        }
+    };
+
+    async function renderRanking() {
+        const container = document.getElementById('mlb-grid-container');
+        container.innerHTML = "<div class='p-8 text-center text-slate-400 text-xs'>読み込み中...</div>";
+
+        try {
+            // initCloud内で作成済みのsupabaseクライアントを探す
+            // もし見つからない場合は再定義
+            const client = (typeof supabase !== 'undefined') ? supabase : window.supabase.createClient('https://zekfibkimvsfbnctwzti.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs');
+
+            const { data, error } = await client.from('game_results').select('*');
+            if (error) throw error;
+
+            const stats = {};
+            data.forEach(row => {
+                const name = row.player_name || '不明';
+                if (!stats[name]) stats[name] = { name, g: 0, sumR: 0, pts: 0 };
+                stats[name].g++;
+                stats[name].sumR += Number(row.rank || 0);
+                stats[name].pts += Number(row.score || 0);
+            });
+
+            const tableData = Object.values(stats).map(p => [
+                p.name, p.g, (p.sumR / p.g).toFixed(2), p.pts > 0 ? `+${p.pts}` : p.pts
+            ]);
+
+            container.innerHTML = "";
+            new gridjs.Grid({
+                columns: ["PLAYER", "G", "AVG", "PTS"],
+                data: tableData,
+                sort: true,
+                style: {
+                    table: { 'font-size': '11px' },
+                    th: { 'background-color': '#1e293b', 'color': '#fb923c', 'text-align': 'center' },
+                    td: { 'text-align': 'center', 'color': '#1e293b' }
+                }
+            }).render(container);
+        } catch (err) {
+            container.innerHTML = `<div class='p-4 text-red-500 text-xs'>通信エラー: ${err.message}</div>`;
+        }
+    }
+
     initCloud();
 });

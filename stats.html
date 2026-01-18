@@ -3,88 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>STATS TEST PAGE</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>LEAGUE STATS</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/gridjs/dist/gridjs.umd.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
-    <script src="https://cdn.jsdelivr.net/npm/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 p-4">
-
     <div class="max-w-md mx-auto space-y-6">
         <header class="flex justify-between items-center py-4">
-            <h1 class="text-xl font-black italic text-blue-900">LEAGUE STATS</h1>
-            <a href="index.html" class="text-xs font-bold text-slate-400 border border-slate-300 px-3 py-1 rounded-full">← BACK</a>
+            <h1 class="text-xl font-black italic text-blue-900 italic">LEAGUE STATS</h1>
+            <a href="index.html" class="text-[10px] font-bold text-slate-400 border border-slate-300 px-3 py-1 rounded-full">← BACK</a>
         </header>
 
-        <div id="mlb-grid-container" class="bg-white rounded-2xl shadow-sm overflow-hidden"></div>
-
-        <div id="debug-status" class="text-[10px] text-slate-400 font-mono text-center">Loading Supabase Data...</div>
+        <div id="status" class="text-[10px] text-center text-slate-400 font-mono">Connecting...</div>
+        
+        <div id="grid-wrapper" class="bg-white rounded-xl shadow-sm overflow-hidden"></div>
     </div>
-
-         <!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CONNECTION TEST</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-</head>
-<body style="font-family: sans-serif; padding: 20px;">
-    <h2>Supabase 疎通確認</h2>
-    <div id="status" style="padding: 10px; background: #eee; border-radius: 5px;">
-        ライブラリを読み込み中...
-    </div>
-    <div id="data-view" style="margin-top: 20px; font-size: 12px; white-space: pre-wrap;"></div>
 
     <script>
         const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
 
-        async function startTest() {
+        async function init() {
             const statusEl = document.getElementById('status');
-            const dataEl = document.getElementById('data-view');
-
-            // 2. ライブラリが正しく読み込まれたかチェック
-            if (!window.supabase) {
-                statusEl.innerText = "❌ エラー: Supabaseライブラリが読み込めません";
-                statusEl.style.color = "red";
-                return;
-            }
-
-            statusEl.innerText = "🔄 接続中...";
             const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
             try {
-                // 3. game_results テーブルへのアクセス
-                const { data, error } = await supabase
-                    .from('game_results')
-                    .select('*')
-                    .limit(5);
+                // 1. データの取得
+                const { data, error } = await supabase.from('game_results').select('*');
+                if (error) throw error;
 
-                if (error) {
-                    statusEl.innerText = "❌ 通信エラー: " + error.message;
-                    return;
-                }
+                // 2. データの集計（プレイヤーごと）
+                const stats = {};
+                data.forEach(row => {
+                    const name = row.player_name;
+                    if (!stats[name]) stats[name] = { name, g: 0, sumR: 0, pts: 0 };
+                    stats[name].g++;
+                    stats[name].sumR += Number(row.rank);
+                    stats[name].pts += Number(row.score);
+                });
 
-                if (data && data.length > 0) {
-                    statusEl.innerText = "✅ 成功！データが届きました。";
-                    statusEl.style.background = "#d1fae5";
-                    dataEl.innerText = JSON.stringify(data, null, 2);
-                } else {
-                    statusEl.innerText = "⚠️ 接続成功しましたが、データが0件です。";
-                }
+                // 3. Grid.js用の形式に変換
+                const tableData = Object.values(stats).map(p => [
+                    p.name,
+                    p.g,
+                    (p.sumR / p.g).toFixed(2),
+                    p.pts > 0 ? `+${p.pts}` : p.pts
+                ]);
+
+                // 4. 表の描画
+                new gridjs.Grid({
+                    columns: ["PLAYER", "G", "AVG", "PTS"],
+                    data: tableData,
+                    sort: true,
+                    style: {
+                        table: { 'font-size': '12px' },
+                        th: { 'background-color': '#1e293b', 'color': '#fff', 'text-align': 'center' },
+                        td: { 'text-align': 'center' }
+                    }
+                }).render(document.getElementById('grid-wrapper'));
+
+                statusEl.innerText = `Updated: ${new Date().toLocaleTimeString()}`;
 
             } catch (err) {
-                statusEl.innerText = "❌ システムエラー: " + err.message;
+                statusEl.innerText = "Error: " + err.message;
+                statusEl.style.color = "red";
             }
         }
 
-        // ライブラリの読み込み完了を待ってから実行
-        window.onload = startTest;
+        window.onload = init;
     </script>
-</body>
-</html>
-
 </body>
 </html>

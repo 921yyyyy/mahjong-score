@@ -80,7 +80,7 @@
     <script src="https://cdn.jsdelivr.net/npm/gridjs/dist/gridjs.umd.js"></script>
     <script src="navbar.js"></script>
 
-    <script>
+        <script>
         const S_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
         const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
         const sb = window.supabase.createClient(S_URL, S_KEY);
@@ -95,15 +95,17 @@
                 
                 if (error) throw error;
                 if (!data || data.length === 0) {
-                    container.innerHTML = "<div class='p-10 text-center text-slate-400'>NO DATA FOUND</div>";
+                    container.innerHTML = `<div class='p-10 text-center text-slate-400'>NO DATA FOUND IN ${table.toUpperCase()}</div>`;
                     return;
                 }
 
                 const stats = {};
                 data.forEach(r => {
                     const n = r.player_name || 'Unknown';
+                    // モードによって取得するカラムを切り替え
                     const rk = mode === 'match' ? Number(r.rank || 0) : Number(r.final_rank || 0);
                     const sc = mode === 'match' ? Number(r.score || 0) : Number(r.total_score || 0);
+                    
                     if(!stats[n]) stats[n] = { n, g:0, sumR:0, pts:0, f:0, s:0, l:0, mx:-999 };
                     stats[n].g++;
                     stats[n].sumR += rk;
@@ -118,7 +120,10 @@
                     const pC = p.pts > 0 ? 'pts-positive' : (p.pts < 0 ? 'pts-negative' : '');
                     const pV = p.pts > 0 ? '+'+p.pts : p.pts;
                     return [
-                        p.n, p.g, (p.sumR/p.g).toFixed(2), p.f, 
+                        p.n, 
+                        p.g, 
+                        (p.sumR/p.g).toFixed(2), 
+                        p.f, 
                         ((p.f/p.g)*100).toFixed(1)+'%', 
                         (((p.f+p.s)/p.g)*100).toFixed(1)+'%',
                         ((1-(p.l/p.g))*100).toFixed(1)+'%',
@@ -135,8 +140,8 @@
                 new gridjs.Grid({
                     columns: cols,
                     data: tableData,
-                    sort: true, // 並べ替え機能の復活
-                    search: true, // 検索機能の復活
+                    sort: true,
+                    search: true,
                     fixedHeader: true,
                     style: { table: { 'min-width': '650px' } },
                     language: { 'search': { 'placeholder': '選手名検索...' } }
@@ -155,5 +160,6 @@
 
         window.onload = () => loadStats('match');
     </script>
+
 </body>
 </html>

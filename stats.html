@@ -22,7 +22,8 @@
         <div id="debug-status" class="text-[10px] text-slate-400 font-mono text-center">Loading Supabase Data...</div>
     </div>
 
-       <script>
+         <script>
+        // 1. 設定
         const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -31,63 +32,35 @@
             const statusEl = document.getElementById('debug-status');
             const container = document.getElementById('mlb-grid-container');
             
+            // ログの開始
+            statusEl.innerText = "Connecting to Supabase...";
+
             try {
-                console.log("Fetching data...");
-                const { data, error } = await supabase.from('game_results').select('player_name, score, rank');
+                // game_results テーブルから取得を試みる
+                const { data, error } = await supabase
+                    .from('game_results')
+                    .select('player_name, score, rank');
                 
-                if (error) {
-                    throw new Error(`Supabase Error: ${error.message}`);
-                }
+                if (error) throw error;
 
                 if (!data || data.length === 0) {
-                    statusEl.innerHTML = "⚠️ データが0件です。Supabaseにレコードがあるか確認してください。";
+                    statusEl.innerText = "Success but 0 rows found.";
                     return;
                 }
 
-                // 集計ロジック
-                const statsMap = {};
-                data.forEach(row => {
-                    const name = row.player_name || '不明';
-                    if (!statsMap[name]) {
-                        statsMap[name] = { name: name, g: 0, sumR: 0, pts: 0 };
-                    }
-                    statsMap[name].g++;
-                    statsMap[name].sumR += Number(row.rank || 0);
-                    statsMap[name].pts += Number(row.score || 0);
-                });
-
-                const tableData = Object.values(statsMap).map(p => [
-                    p.name, 
-                    p.g, 
-                    (p.sumR / p.g).toFixed(2), 
-                    p.pts.toLocaleString()
-                ]);
-
-                // Grid.js 描画
-                container.innerHTML = ""; // クリア
-                new gridjs.Grid({
-                    columns: ["PLAYER", "G", "AVG", "PTS"],
-                    data: tableData,
-                    sort: true,
-                    style: {
-                        table: { 'font-size': '12px' },
-                        th: { 'background-color': '#041e42', 'color': '#fff' }
-                    }
-                }).render(container);
-
-                statusEl.innerText = `取得完了: ${data.length} 件のデータ`;
+                // 【超重要】まずは表にせず、生データをそのまま画面に出す
+                statusEl.innerText = `Success! Fetched ${data.length} rows.`;
+                container.innerHTML = `<pre class="text-[10px] bg-slate-100 p-2 overflow-auto max-h-64">${JSON.stringify(data, null, 2)}</pre>`;
 
             } catch (err) {
-                // スマホの画面上にエラーをデカデカと表示させる
-                statusEl.innerHTML = `
-                    <div class="bg-red-100 p-4 rounded-lg text-red-700 text-left overflow-auto">
-                        <strong>❌ ERROR:</strong><br>
-                        ${err.message}
-                    </div>
-                `;
+                // エラーを緊急表示
+                statusEl.style.color = "red";
+                statusEl.innerText = "Error: " + err.message;
+                console.error(err);
             }
         }
 
+        // 実行
         window.onload = loadMlbStats;
     </script>
 </body>

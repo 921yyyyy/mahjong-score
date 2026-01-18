@@ -22,36 +22,40 @@
         <div id="debug-status" class="text-[10px] text-slate-400 font-mono text-center">Loading Supabase Data...</div>
     </div>
 
-    <script>
-        // --- 1. Supabase設定 ---
+       <script>
         const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // --- 2. データ取得と表示 ---
         async function loadMlbStats() {
             const statusEl = document.getElementById('debug-status');
+            const container = document.getElementById('mlb-grid-container');
+            
             try {
-                // game_resultsから全データを取得
-                const { data, error } = await supabase.from('game_results').select('*');
+                console.log("Fetching data...");
+                const { data, error } = await supabase.from('game_results').select('player_name, score, rank');
                 
-                if (error) throw error;
+                if (error) {
+                    throw new Error(`Supabase Error: ${error.message}`);
+                }
+
                 if (!data || data.length === 0) {
-                    statusEl.innerText = "No data found in Supabase.";
+                    statusEl.innerHTML = "⚠️ データが0件です。Supabaseにレコードがあるか確認してください。";
                     return;
                 }
 
-                // プレイヤーごとに集計
-                const statsMap = data.reduce((acc, cur) => {
-                    const name = cur.player_name || 'Unknown';
-                    if (!acc[name]) acc[name] = { name: name, g: 0, sumR: 0, pts: 0 };
-                    acc[name].g++;
-                    acc[name].sumR += (cur.rank || 0);
-                    acc[name].pts += (cur.score || 0);
-                    return acc;
-                }, {});
+                // 集計ロジック
+                const statsMap = {};
+                data.forEach(row => {
+                    const name = row.player_name || '不明';
+                    if (!statsMap[name]) {
+                        statsMap[name] = { name: name, g: 0, sumR: 0, pts: 0 };
+                    }
+                    statsMap[name].g++;
+                    statsMap[name].sumR += Number(row.rank || 0);
+                    statsMap[name].pts += Number(row.score || 0);
+                });
 
-                // Grid.js用のデータ形式に変換 [名前, 試合数, 平均順位, 合計得点]
                 const tableData = Object.values(statsMap).map(p => [
                     p.name, 
                     p.g, 
@@ -59,28 +63,31 @@
                     p.pts.toLocaleString()
                 ]);
 
-                // Grid.jsの描画
+                // Grid.js 描画
+                container.innerHTML = ""; // クリア
                 new gridjs.Grid({
                     columns: ["PLAYER", "G", "AVG", "PTS"],
                     data: tableData,
                     sort: true,
                     style: {
                         table: { 'font-size': '12px' },
-                        th: { 'background-color': '#041e42', 'color': '#fff', 'padding': '10px' },
-                        td: { 'padding': '10px' }
+                        th: { 'background-color': '#041e42', 'color': '#fff' }
                     }
-                }).render(document.getElementById('mlb-grid-container'));
+                }).render(container);
 
-                statusEl.innerText = `Last updated: ${new Date().toLocaleTimeString()}`;
+                statusEl.innerText = `取得完了: ${data.length} 件のデータ`;
 
             } catch (err) {
-                console.error(err);
-                statusEl.innerHTML = "Error: " + err.message + "<br>Detail: " + JSON.stringify(err);
-                statusEl.classList.add('text-red-500');
+                // スマホの画面上にエラーをデカデカと表示させる
+                statusEl.innerHTML = `
+                    <div class="bg-red-100 p-4 rounded-lg text-red-700 text-left overflow-auto">
+                        <strong>❌ ERROR:</strong><br>
+                        ${err.message}
+                    </div>
+                `;
             }
         }
 
-        // 読み込み開始
         window.onload = loadMlbStats;
     </script>
 </body>

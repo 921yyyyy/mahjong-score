@@ -398,17 +398,23 @@ const updatePlayerSuggestions = async () => {
         }
     };
 
+        // === ランキング表示機能 (修正版) ===
     async function renderRanking() {
         const container = document.getElementById('mlb-grid-container');
-        container.innerHTML = "<div class='p-8 text-center text-slate-400 text-xs'>読み込み中...</div>";
+        // 読み込み中であることを白文字で表示（背景が暗いため）
+        container.innerHTML = "<div class='p-8 text-center text-white text-xs'>データを取得中...</div>";
 
         try {
-            // initCloud内で作成済みのsupabaseクライアントを探す
-            // もし見つからない場合は再定義
+            // supabase クライアントの確定
             const client = (typeof supabase !== 'undefined') ? supabase : window.supabase.createClient('https://zekfibkimvsfbnctwzti.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs');
 
             const { data, error } = await client.from('game_results').select('*');
+            
             if (error) throw error;
+            if (!data || data.length === 0) {
+                container.innerHTML = "<div class='p-8 text-center text-orange-400 text-xs'>データがまだありません</div>";
+                return;
+            }
 
             const stats = {};
             data.forEach(row => {
@@ -429,15 +435,18 @@ const updatePlayerSuggestions = async () => {
                 data: tableData,
                 sort: true,
                 style: {
-                    table: { 'font-size': '11px' },
+                    table: { 'font-size': '11px', 'background-color': '#fff' }, // テーブル背景を白に固定
                     th: { 'background-color': '#1e293b', 'color': '#fb923c', 'text-align': 'center' },
-                    td: { 'text-align': 'center', 'color': '#1e293b' }
+                    td: { 'text-align': 'center', 'color': '#1e293b', 'font-weight': 'bold' }
                 }
             }).render(container);
+
         } catch (err) {
-            container.innerHTML = `<div class='p-4 text-red-500 text-xs'>通信エラー: ${err.message}</div>`;
+            console.error("Ranking Error:", err);
+            container.innerHTML = `<div class='p-4 text-red-500 text-xs bg-white rounded'>通信エラー: ${err.message}</div>`;
         }
     }
+
 
     initCloud();
 });

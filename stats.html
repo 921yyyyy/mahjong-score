@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STATS TEST PAGE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gridjs/dist/gridjs.umd.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 p-4">
+
+    <div class="max-w-md mx-auto space-y-6">
+        <header class="flex justify-between items-center py-4">
+            <h1 class="text-xl font-black italic text-blue-900">LEAGUE STATS</h1>
+            <a href="index.html" class="text-xs font-bold text-slate-400 border border-slate-300 px-3 py-1 rounded-full">← BACK</a>
+        </header>
+
+        <div id="mlb-grid-container" class="bg-white rounded-2xl shadow-sm overflow-hidden"></div>
+
+        <div id="debug-status" class="text-[10px] text-slate-400 font-mono text-center">Loading Supabase Data...</div>
+    </div>
+
+    <script>
+        // --- 1. Supabase設定 ---
+        const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // --- 2. データ取得と表示 ---
+        async function loadMlbStats() {
+            const statusEl = document.getElementById('debug-status');
+            try {
+                // game_resultsから全データを取得
+                const { data, error } = await supabase.from('game_results').select('*');
+                
+                if (error) throw error;
+                if (!data || data.length === 0) {
+                    statusEl.innerText = "No data found in Supabase.";
+                    return;
+                }
+
+                // プレイヤーごとに集計
+                const statsMap = data.reduce((acc, cur) => {
+                    const name = cur.player_name || 'Unknown';
+                    if (!acc[name]) acc[name] = { name: name, g: 0, sumR: 0, pts: 0 };
+                    acc[name].g++;
+                    acc[name].sumR += (cur.rank || 0);
+                    acc[name].pts += (cur.score || 0);
+                    return acc;
+                }, {});
+
+                // Grid.js用のデータ形式に変換 [名前, 試合数, 平均順位, 合計得点]
+                const tableData = Object.values(statsMap).map(p => [
+                    p.name, 
+                    p.g, 
+                    (p.sumR / p.g).toFixed(2), 
+                    p.pts.toLocaleString()
+                ]);
+
+                // Grid.jsの描画
+                new gridjs.Grid({
+                    columns: ["PLAYER", "G", "AVG", "PTS"],
+                    data: tableData,
+                    sort: true,
+                    style: {
+                        table: { 'font-size': '12px' },
+                        th: { 'background-color': '#041e42', 'color': '#fff', 'padding': '10px' },
+                        td: { 'padding': '10px' }
+                    }
+                }).render(document.getElementById('mlb-grid-container'));
+
+                statusEl.innerText = `Last updated: ${new Date().toLocaleTimeString()}`;
+
+            } catch (err) {
+                console.error(err);
+                statusEl.innerText = "Error: " + err.message;
+                statusEl.classList.add('text-red-500');
+            }
+        }
+
+        // 読み込み開始
+        window.onload = loadMlbStats;
+    </script>
+</body>
+</html>

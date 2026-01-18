@@ -3,77 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LEAGUE STATS</title>
+    <title>STATS | MLB Mahjong Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/gridjs/dist/gridjs.umd.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
-    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #070d1c; color: #f1f5f9; font-family: 'Inter', sans-serif; }
+        .gridjs-container { padding: 0; color: #1e293b; }
+        
+        .gridjs-wrapper { 
+            border-radius: 0; 
+            border: none; 
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .gridjs-th {
+            background-color: #041e42 !important;
+            color: #ffffff !important;
+            text-transform: uppercase;
+            font-size: 9px !important;
+            letter-spacing: 0.05em;
+            padding: 12px 5px !important;
+            text-align: center !important;
+            min-width: 70px;
+        }
+
+        /* === 修正箇所：背景色を白(#ffffff)に固定し、透過を防ぐ === */
+        .gridjs-td:first-child {
+            position: sticky !important;
+            left: 0;
+            z-index: 2;
+            background-color: #ffffff !important; /* ここを白に固定 */
+            min-width: 90px !important;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        }
+        /* 奇数行の固定列も、背景色を合わせる */
+        .gridjs-tr:nth-child(odd) .gridjs-td:first-child {
+            background-color: #f8fafc !important; /* ゼブラ柄の薄いグレーに固定 */
+        }
+
+        .gridjs-th:first-child {
+            position: sticky !important;
+            left: 0;
+            z-index: 3;
+            background-color: #041e42 !important; /* ヘッダーはネイビーに固定 */
+            min-width: 90px !important;
+        }
+
+        .gridjs-td {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+            font-weight: 800 !important;
+            font-size: 11px !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            padding: 12px 5px !important;
+            text-align: center !important;
+        }
+        .gridjs-tr:nth-child(odd) .gridjs-td { background-color: #f8fafc !important; }
+        
+        .gridjs-sort { background-color: transparent !important; }
+        button.gridjs-sort-neutral, button.gridjs-sort-asc, button.gridjs-sort-desc {
+            filter: brightness(0) invert(1);
+            opacity: 0.8;
+        }
+        .pts-positive { color: #1d4ed8 !important; }
+        .pts-negative { color: #be123c !important; }
+        .gridjs-search-input {
+            background-color: #1e293b !important;
+            border: 1px solid #334155 !important;
+            color: white !important;
+            border-radius: 8px !important;
+        }
+    </style>
 </head>
-<body class="bg-slate-50 p-4">
-    <div class="max-w-md mx-auto space-y-6">
-        <header class="flex justify-between items-center py-4">
-            <h1 class="text-xl font-black italic text-blue-900 italic">LEAGUE STATS</h1>
-            <a href="index.html" class="text-[10px] font-bold text-slate-400 border border-slate-300 px-3 py-1 rounded-full">← BACK</a>
+<body class="p-0 pb-24">
+    <div class="max-w-4xl mx-auto">
+        <header class="p-6 bg-gradient-to-b from-[#041e42] to-[#070d1c] border-b border-orange-500/30 mb-2">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-black italic tracking-tighter text-white uppercase">Player Stats</h1>
+                    <p class="text-[10px] font-bold text-orange-400 tracking-widest uppercase">Analysis Center</p>
+                </div>
+                <div class="text-right">
+                    <span class="block text-[10px] text-slate-400 font-bold uppercase">League</span>
+                    <span class="text-sm font-black text-white italic">PRO DIVISION</span>
+                </div>
+            </div>
         </header>
 
-        <div id="status" class="text-[10px] text-center text-slate-400 font-mono">Connecting...</div>
-        
-        <div id="grid-wrapper" class="bg-white rounded-xl shadow-sm overflow-hidden"></div>
+        <div id="mlb-grid-container" class="bg-white min-h-[200px]"></div>
     </div>
 
+    <script src="navbar.js"></script>
+
     <script>
-        const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
-
-        async function init() {
-            const statusEl = document.getElementById('status');
+        document.addEventListener('DOMContentLoaded', async () => {
+            const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
+            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
             const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
+            const container = document.getElementById('mlb-grid-container');
+            
             try {
-                // 1. データの取得
                 const { data, error } = await supabase.from('game_results').select('*');
                 if (error) throw error;
 
-                // 2. データの集計（プレイヤーごと）
                 const stats = {};
                 data.forEach(row => {
-                    const name = row.player_name;
-                    if (!stats[name]) stats[name] = { name, g: 0, sumR: 0, pts: 0 };
+                    const name = row.player_name || 'Unknown';
+                    const rank = Number(row.rank || 0);
+                    const score = Number(row.score || 0);
+                    if (!stats[name]) {
+                        stats[name] = { name, g: 0, sumR: 0, pts: 0, first: 0, second: 0, last: 0, max: -999 };
+                    }
                     stats[name].g++;
-                    stats[name].sumR += Number(row.rank);
-                    stats[name].pts += Number(row.score);
+                    stats[name].sumR += rank;
+                    stats[name].pts += score;
+                    if (rank === 1) stats[name].first++;
+                    if (rank === 2) stats[name].second++;
+                    if (rank === 4) stats[name].last++;
+                    if (score > stats[name].max) stats[name].max = score;
                 });
 
-                // 3. Grid.js用の形式に変換
-                const tableData = Object.values(stats).map(p => [
-                    p.name,
-                    p.g,
-                    (p.sumR / p.g).toFixed(2),
-                    p.pts > 0 ? `+${p.pts}` : p.pts
-                ]);
+                const tableData = Object.values(stats)
+                    .sort((a, b) => b.pts - a.pts)
+                    .map(p => {
+                        const topRate = ((p.first / p.g) * 100).toFixed(1) + '%';
+                        const renRate = (((p.first + p.second) / p.g) * 100).toFixed(1) + '%';
+                        const lastEsc = ((1 - (p.last / p.g)) * 100).toFixed(1) + '%';
+                        const ptsClass = p.pts > 0 ? 'pts-positive' : (p.pts < 0 ? 'pts-negative' : '');
+                        
+                        return [
+                            p.name, p.g, (p.sumR / p.g).toFixed(2), 
+                            p.first, topRate, renRate, lastEsc, p.max,
+                            gridjs.html(`<span class="${ptsClass}">${p.pts > 0 ? '+' + p.pts : p.pts}</span>`)
+                        ];
+                    });
 
-                // 4. 表の描画
                 new gridjs.Grid({
-                    columns: ["PLAYER", "G", "AVG", "PTS"],
+                    columns: ["PLAYER", "G", "AVG", "1ST", "TOP%", "REN%", "L-ESC%", "MAX", "PTS"],
                     data: tableData,
                     sort: true,
-                    style: {
-                        table: { 'font-size': '12px' },
-                        th: { 'background-color': '#1e293b', 'color': '#fff', 'text-align': 'center' },
-                        td: { 'text-align': 'center' }
-                    }
-                }).render(document.getElementById('grid-wrapper'));
-
-                statusEl.innerText = `Updated: ${new Date().toLocaleTimeString()}`;
+                    search: true,
+                    fixedHeader: true,
+                    style: { table: { 'min-width': '650px' } },
+                    language: { 'search': { 'placeholder': '選手名検索...' } }
+                }).render(container);
 
             } catch (err) {
-                statusEl.innerText = "Error: " + err.message;
-                statusEl.style.color = "red";
+                container.innerHTML = `<div class='p-10 text-red-500 text-center font-bold'>ERROR: ${err.message}</div>`;
             }
-        }
-
-        window.onload = init;
+        });
     </script>
-        <script src="navbar.js"></script>
 </body>
 </html>

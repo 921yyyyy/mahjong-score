@@ -6,40 +6,74 @@
     <title>STATS | Professional</title>
     <link href="https://cdn.jsdelivr.net/npm/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
-    
     <style>
-        body { background-color: #070d1c; color: #f1f5f9; font-family: sans-serif; }
-        .gridjs-container { color: #1e293b; }
-        .gridjs-wrapper { overflow-x: auto !important; }
-        .gridjs-th { background-color: #041e42 !important; color: white !important; font-size: 10px !important; min-width: 70px; text-align: center; }
-        .gridjs-td { background-color: white !important; font-weight: 800 !important; font-size: 12px !important; text-align: center; }
-        
-        /* PLAYER列固定 */
+        body { background-color: #070d1c; color: #f1f5f9; font-family: 'Inter', sans-serif; }
+        .gridjs-container { padding: 0; color: #1e293b; }
+        .gridjs-wrapper { border-radius: 0; border: none; overflow-x: auto !important; }
+
+        /* 項目名（ヘッダー）の潰れ防止 */
+        .gridjs-th {
+            background-color: #041e42 !important; color: #ffffff !important;
+            text-transform: uppercase; font-size: 9px !important;
+            letter-spacing: 0.05em; padding: 12px 5px !important; text-align: center !important;
+            min-width: 75px; /* 最小幅を確保 */
+        }
+
+        /* 1列目(PLAYER)固定 & 不透明化 */
         .gridjs-td:first-child, .gridjs-th:first-child {
             position: sticky !important; left: 0; z-index: 10; min-width: 90px !important;
         }
         .gridjs-th:first-child { background-color: #041e42 !important; }
-        .gridjs-td:first-child { background-color: #ffffff !important; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
+        .gridjs-td:first-child {
+            background-color: #ffffff !important;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        }
 
+        /* 縞々（ゼブラ柄）の復活 */
+        .gridjs-td {
+            background-color: #ffffff !important; color: #1e293b !important;
+            font-weight: 800 !important; font-size: 11px !important;
+            border-bottom: 1px solid #e2e8f0 !important; padding: 12px 5px !important;
+            text-align: center !important;
+        }
+        .gridjs-tr:nth-child(odd) .gridjs-td { background-color: #f8fafc !important; }
+        .gridjs-tr:nth-child(odd) .gridjs-td:first-child { background-color: #f8fafc !important; }
+
+        /* 並べ替え矢印を白く */
+        .gridjs-sort { background-color: transparent !important; }
+        button.gridjs-sort-neutral, button.gridjs-sort-asc, button.gridjs-sort-desc {
+            filter: brightness(0) invert(1); opacity: 0.8;
+        }
+
+        /* PTSの色分け */
         .pts-positive { color: #1d4ed8 !important; }
         .pts-negative { color: #be123c !important; }
 
-        .tab-button { opacity: 0.4; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; }
-        .tab-button.active { opacity: 1; color: #f97316; border-bottom: 3px solid #f97316; }
+        /* タブデザイン */
+        .tab-button { transition: all 0.3s ease; position: relative; opacity: 0.4; font-weight: 900; text-transform: uppercase; }
+        .tab-button.active { opacity: 1; color: #f97316; }
+        .tab-button.active::after {
+            content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
+            width: 20px; height: 3px; background: #f97316; border-radius: 2px;
+        }
+
+        /* 検索窓のスタイル */
+        .gridjs-search-input {
+            background-color: #1e293b !important; border: 1px solid #334155 !important;
+            color: white !important; border-radius: 8px !important;
+        }
     </style>
 </head>
 <body class="pb-24">
     <div class="max-w-4xl mx-auto">
-        <header class="p-6 bg-[#041e42] border-b border-orange-500/30">
-            <h1 class="text-2xl font-black italic text-white uppercase mb-4">Analysis Center</h1>
+        <header class="p-6 bg-gradient-to-b from-[#041e42] to-[#070d1c] border-b border-orange-500/30">
+            <h1 class="text-2xl font-black italic text-white uppercase mb-6 leading-none tracking-tighter text-white">Analysis Center</h1>
             <div class="flex space-x-8">
-                <button onclick="changeTab('match')" id="btn-match" class="tab-button active pb-2">Match</button>
-                <button onclick="changeTab('session')" id="btn-session" class="tab-button pb-2">Session</button>
+                <button onclick="changeTab('match')" id="btn-match" class="tab-button active text-xs tracking-widest">Match</button>
+                <button onclick="changeTab('session')" id="btn-session" class="tab-button text-xs tracking-widest">Session</button>
             </div>
         </header>
-        <div id="mlb-grid-container" class="bg-white min-h-[300px] text-black p-4 text-center font-bold">
-            INITIALIZING...
-        </div>
+        <div id="mlb-grid-container" class="bg-white min-h-[400px]"></div>
     </div>
 
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
@@ -47,16 +81,13 @@
     <script src="navbar.js"></script>
 
     <script>
-        // グローバル変数
         const S_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
         const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
         const sb = window.supabase.createClient(S_URL, S_KEY);
-        let currentMode = 'match';
 
-        // 1. データ取得
         async function loadStats(mode) {
             const container = document.getElementById('mlb-grid-container');
-            container.innerHTML = "LOADING " + mode.toUpperCase() + "...";
+            container.innerHTML = "<div class='p-10 text-center text-slate-400 font-bold animate-pulse'>LOADING...</div>";
 
             try {
                 const table = mode === 'match' ? 'game_results' : 'set_summaries';
@@ -64,11 +95,10 @@
                 
                 if (error) throw error;
                 if (!data || data.length === 0) {
-                    container.innerHTML = "NO DATA FOUND IN " + table;
+                    container.innerHTML = "<div class='p-10 text-center text-slate-400'>NO DATA FOUND</div>";
                     return;
                 }
 
-                // 2. 集計
                 const stats = {};
                 data.forEach(r => {
                     const n = r.player_name || 'Unknown';
@@ -101,30 +131,28 @@
                     ? ["PLAYER", "G", "AVG", "1ST", "TOP%", "REN%", "L-ESC%", "MAX", "PTS"]
                     : ["PLAYER", "S-G", "S-AVG", "S-1ST", "S-TOP%", "S-REN%", "S-ESC%", "S-MAX", "S-PTS"];
 
-                // 3. 描画
                 container.innerHTML = ''; 
                 new gridjs.Grid({
                     columns: cols,
                     data: tableData,
-                    sort: true,
+                    sort: true, // 並べ替え機能の復活
+                    search: true, // 検索機能の復活
                     fixedHeader: true,
-                    style: { table: { 'min-width': '600px' } }
+                    style: { table: { 'min-width': '650px' } },
+                    language: { 'search': { 'placeholder': '選手名検索...' } }
                 }).render(container);
 
             } catch (e) {
-                container.innerHTML = "ERROR: " + e.message;
+                container.innerHTML = "<div class='p-10 text-red-500 font-bold'>ERROR: " + e.message + "</div>";
             }
         }
 
-        // 4. タブ切り替え関数（グローバルに配置）
         window.changeTab = function(mode) {
-            currentMode = mode;
             document.getElementById('btn-match').classList.toggle('active', mode === 'match');
             document.getElementById('btn-session').classList.toggle('active', mode === 'session');
             loadStats(mode);
         };
 
-        // 5. 初回起動
         window.onload = () => loadStats('match');
     </script>
 </body>

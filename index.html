@@ -38,6 +38,30 @@
 .ts-control input::placeholder {
     color: rgba(255, 255, 255, 0.3) !important;
 }
+/* 選択済みアイテムが改行されないように固定 */
+.ts-control .item {
+    display: inline-block !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 120px !important; /* 枠からはみ出さない最大幅 */
+    vertical-align: middle !important;
+}
+
+/* 入力エリア自体の高さを固定し、中身が溢れても枠を広げない */
+.ts-control {
+    display: flex !important;
+    align-items: center !important;
+    height: 50px !important; /* 前回の設定と合わせる */
+    overflow: hidden !important;
+}
+
+/* 入力中のテキストボックスも1行に固定 */
+.ts-control input {
+    display: inline-block !important;
+    width: auto !important;
+    max-width: 100% !important;
+}
 
         /* Tabulator カスタム */
         .tabulator { background: transparent !important; border: none !important; }

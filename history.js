@@ -1,71 +1,105 @@
-// history.js (自己診断・強化版)
-(function() {
-    const listEl = document.getElementById('historyList');
+const S_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
+const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
+const sb = window.supabase.createClient(S_URL, S_KEY);
 
-    const init = async () => {
-        const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
+async function initHistory() {
+    try {
+        // 1. 全データ取得（最新順）
+        const { data, error } = await sb
+            .from('game_results')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-        // 1. Supabaseが読み込まれているかチェック
-        if (!window.supabase) {
-            listEl.innerHTML = `<div class="text-amber-400 text-xs">Supabaseライブラリを待機中...</div>`;
-            setTimeout(init, 500);
-            return;
-        }
+        if (error) throw error;
 
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // 2. 対局ごとにグループ化 (match_id または created_at をキーにする)
+        // ここでは便宜上、同じ日時のものを1つの対局とみなすロジックにしています
+        const matches = {};
+        data.forEach(row => {
+            const key = row.match_id || row.created_at; 
+            if (!matches[key]) matches[key] = [];
+            matches[key].push(row);
+        });
 
-        try {
-            listEl.innerHTML = `<div class="text-center py-10 text-slate-500 italic">データベースに接続中...</div>`;
+        const swiperWrapper = document.getElementById('history-swiper-wrapper');
+        const historyList = document.getElementById('history-list');
+
+        // 3. 各対局をカード化して表示
+        Object.keys(matches).forEach((key, index) => {
+            const players = matches[key].sort((a, b) => a.rank - b.rank); // 1位から順に並べる
+            const date = new Date(players[0].created_at).toLocaleDateString('ja-JP');
             
-            // 2. データ取得
-            const { data, error } = await supabase
-                .from('games')
-                .select('*');
+            // カードのHTML作成
+            const cardHtml = createGameCard(players, date);
 
-            if (error) throw error;
-
-            // 3. データが空の場合
-            if (!data || data.length === 0) {
-                listEl.innerHTML = `<div class="text-center py-10 text-slate-500">保存されたデータが見つかりませんでした</div>`;
-                return;
+            // 直近3件はSwiper（ハイライト）へ、それ以降はリストへ
+            if (index < 5) {
+                const slide = document.createElement('div');
+                slide.className = 'swiper-slide';
+                slide.innerHTML = cardHtml;
+                swiperWrapper.appendChild(slide);
             }
+            
+            const listItem = document.createElement('div');
+            listItem.innerHTML = cardHtml;
+            historyList.appendChild(listItem);
+        });
 
-            // 4. 描画処理
-            listEl.innerHTML = data.map(game => {
-                const dateStr = game.created_at ? new Date(game.created_at).toLocaleDateString('ja-JP') : "不明な日時";
-                const names = game.player_names || ["?","?","?","?"];
-                const scores = game.scores || [0,0,0,0];
+        // 4. Swiperの初期化
+        new Swiper(".mySwiper", {
+            effect: "cards", // MLBカードっぽく重なるエフェクト
+            grabCursor: true,
+            pagination: { el: ".swiper-pagination" },
+        });
 
-                return `
-                    <div class="bg-slate-800 p-5 rounded-3xl border border-slate-700 shadow-xl mb-4">
-                        <div class="flex justify-between text-[10px] text-slate-500 mb-3 font-mono">
-                            <span>#${game.id}</span>
-                            <span>${dateStr}</span>
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function createGameCard(players, date) {
+    // 1位のプレイヤー情報を取得（カードのメイン顔にするため）
+    const winner = players[0];
+    
+    return `
+        <div class="game-card p-4 mb-4" onclick="showMatchDetail('${players[0].match_id}')">
+            <div class="flex justify-between items-start mb-3 border-b border-white/10 pb-2">
+                <div>
+                    <span class="text-[10px] text-orange-500 font-bold uppercase tracking-widest">${date}</span>
+                    <h3 class="text-lg font-black italic uppercase leading-none">Match Report</h3>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] text-slate-400 block uppercase font-bold">Winner</span>
+                    <span class="text-sm font-bold text-yellow-400">${winner.player_name}</span>
+                </div>
+            </div>
+            
+            <div class="space-y-1">
+                ${players.map(p => `
+                    <div class="flex items-center justify-between bg-black/20 p-2 rounded">
+                        <div class="flex items-center space-x-3">
+                            <span class="rank-badge rank-${p.rank} text-xs">${p.rank}</span>
+                            <span class="text-xs font-bold ${p.rank === 1 ? 'text-white' : 'text-slate-300'}">${p.player_name}</span>
                         </div>
-                        <div class="grid grid-cols-4 gap-2">
-                            ${names.map((name, i) => `
-                                <div class="text-center">
-                                    <div class="text-[10px] text-slate-400 truncate mb-1">${name}</div>
-                                    <div class="text-sm font-black ${scores[i] >= 0 ? 'text-indigo-400' : 'text-rose-400'}">
-                                        ${scores[i] >= 0 ? '+' : ''}${scores[i]}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
+                        <span class="text-xs font-mono font-bold ${p.score >= 0 ? 'text-blue-400' : 'text-red-400'}">
+                            ${p.score > 0 ? '+' : ''}${p.score}
+                        </span>
                     </div>
-                `;
-            }).reverse().join('');
+                `).join('')}
+            </div>
+            
+            <div class="mt-3 text-center">
+                <button class="text-[9px] uppercase tracking-widest text-slate-500 font-bold hover:text-orange-400 transition">
+                    View Full Box Score →
+                </button>
+            </div>
+        </div>
+    `;
+}
 
-        } catch (err) {
-            listEl.innerHTML = `
-                <div class="p-4 bg-rose-950/30 border border-rose-500/50 rounded-2xl text-rose-400 text-xs">
-                    <strong>通信エラーが発生しました</strong><br>
-                    ${err.message}
-                </div>`;
-        }
-    };
+// モーダル表示（後ほど実装）
+window.showMatchDetail = function(matchId) {
+    alert("Match Detail: " + matchId + "\\n詳細モーダルの実装に進みますか？");
+};
 
-    // 実行
-    init();
-})();
+initHistory();

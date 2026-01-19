@@ -3,23 +3,187 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🀄 対局履歴 - MS PRO</title>
+    <title>HISTORY | Professional Analysis</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+    <style>
+        body { background-color: #070d1c; color: white; font-family: 'Inter', sans-serif; overflow-x: hidden; }
+        
+        /* MLBスコアボード風：高級感のあるグラデーションカード */
+        .game-card {
+            background: linear-gradient(180deg, #161e2d 0%, #0a0f1a 100%);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7);
+            transition: transform 0.2s ease;
+        }
+
+        /* Swiper Coverflow 調整 */
+        .swiper { width: 100%; padding-top: 30px; padding-bottom: 50px; }
+        .swiper-slide {
+            background-position: center; background-size: cover;
+            width: 320px; /* カードの幅 */
+            opacity: 0.3;
+            transition: opacity 0.4s ease;
+        }
+        .swiper-slide-active { opacity: 1; }
+
+        /* スコアのタイポグラフィ */
+        .score-font { font-family: 'Roboto Mono', monospace; }
+        
+        /* 順位の色分け */
+        .rank-gold { color: #facc15; text-shadow: 0 0 10px rgba(250, 204, 21, 0.4); }
+        .rank-silver { color: #cbd5e1; }
+        .rank-normal { color: #64748b; }
+
+        /* 下部リスト用 */
+        .list-item-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 3px solid #f97316;
+        }
+    </style>
 </head>
-<body class="p-4 bg-slate-900 text-slate-100 pb-24">
-    <div class="max-w-xl mx-auto space-y-6">
-        <header class="flex justify-between items-center">
-            <h1 class="text-xl font-black text-orange-400">PAST GAMES</h1>
-            <a href="index.html" class="text-xs bg-slate-800 px-4 py-2 rounded-full border border-slate-700">← 戻る</a>
+<body class="pb-24">
+    <div class="max-w-4xl mx-auto p-4">
+        <header class="mb-10 pt-6">
+            <span class="text-[10px] text-orange-500 font-black tracking-[0.3em] uppercase block mb-1">Data Archive</span>
+            <h1 class="text-3xl font-black italic uppercase tracking-tighter border-b-2 border-orange-500 inline-block leading-none pb-1">Session History</h1>
         </header>
 
-        <div id="historyList" class="space-y-4">
-            <div class="text-center py-10 text-slate-500">データを読み込み中...</div>
-        </div>
+        <section class="mb-12">
+            <h2 class="text-[10px] font-bold text-slate-500 mb-4 uppercase tracking-[0.2em] px-2">Featured Sessions</h2>
+            <div class="swiper mySwiper">
+                <div class="swiper-wrapper" id="history-swiper-wrapper">
+                    </div>
+                <div class="swiper-pagination"></div>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="text-[10px] font-bold text-slate-500 mb-6 uppercase tracking-[0.2em] px-2 border-l-2 border-orange-500 ml-2">All Logs</h2>
+            <div id="history-list" class="space-y-6 px-2">
+                </div>
+        </section>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="history.js"></script>
-        <script src="navbar.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+    <script src="navbar.js"></script>
+
+    <script>
+        const S_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
+        const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
+        const sb = window.supabase.createClient(S_URL, S_KEY);
+
+        async function initHistory() {
+            try {
+                // 1. Sessionデータを取得
+                const { data: sessionData, error } = await sb
+                    .from('set_summaries')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                // 2. 日付ごとにグループ化
+                const sessions = {};
+                sessionData.forEach(row => {
+                    // 日本時間の日付をキーにする
+                    const dateObj = new Date(row.created_at);
+                    const dateKey = dateObj.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                    if (!sessions[dateKey]) sessions[dateKey] = [];
+                    sessions[dateKey].push(row);
+                });
+
+                const swiperWrapper = document.getElementById('history-swiper-wrapper');
+                const historyList = document.getElementById('history-list');
+
+                Object.keys(sessions).forEach((date, index) => {
+                    const players = sessions[date].sort((a, b) => a.final_rank - b.final_rank);
+                    const cardHtml = createSessionCard(players, date);
+
+                    // 直近5件をSwiperへ
+                    if (index < 5) {
+                        const slide = document.createElement('div');
+                        slide.className = 'swiper-slide';
+                        slide.innerHTML = cardHtml;
+                        swiperWrapper.appendChild(slide);
+                    }
+                    
+                    // すべてをリストへ
+                    const listItem = document.createElement('div');
+                    listItem.className = 'list-item-card p-4 rounded-r-lg';
+                    listItem.innerHTML = cardHtml;
+                    historyList.appendChild(listItem);
+                });
+
+                // 3. Swiper Coverflow 初期化
+                new Swiper(".mySwiper", {
+                    effect: "coverflow",
+                    grabCursor: true,
+                    centeredSlides: true,
+                    slidesPerView: "auto",
+                    coverflowEffect: {
+                        rotate: 35,
+                        stretch: 0,
+                        depth: 100,
+                        modifier: 1,
+                        slideShadows: false,
+                    },
+                    pagination: { el: ".swiper-pagination", clickable: true },
+                });
+
+            } catch (e) {
+                console.error("Initialization Error:", e);
+            }
+        }
+
+        function createSessionCard(players, date) {
+            const winner = players[0];
+            const sessionId = players[0].session_id || date;
+
+            return `
+                <div class="game-card p-5" onclick="showSessionDetail('${sessionId}', '${date}')">
+                    <div class="flex justify-between items-start mb-5">
+                        <div>
+                            <span class="text-[9px] text-orange-500 font-black tracking-widest uppercase">Daily Result</span>
+                            <h3 class="text-xl font-black italic tracking-tighter leading-none">${date}</h3>
+                        </div>
+                        <div class="bg-orange-600 text-white text-[8px] px-2 py-0.5 font-bold uppercase rounded-sm">Finalized</div>
+                    </div>
+                    
+                    <div class="space-y-2">
+                        ${players.map(p => `
+                            <div class="flex items-center justify-between border-b border-white/5 pb-1 last:border-0">
+                                <div class="flex items-center space-x-3">
+                                    <span class="text-base font-black italic w-4 ${p.final_rank === 1 ? 'rank-gold' : (p.final_rank === 2 ? 'rank-silver' : 'rank-normal')}">${p.final_rank}</span>
+                                    <span class="text-xs font-bold tracking-tight text-slate-200">${p.player_name}</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-sm score-font font-black ${p.total_score >= 0 ? 'text-blue-400' : 'text-red-400'}">
+                                        ${p.total_score > 0 ? '+' : ''}${p.total_score}
+                                    </span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="mt-5 flex justify-between items-center opacity-50">
+                        <span class="text-[8px] font-bold uppercase tracking-widest">Tap for box score</span>
+                        <div class="w-10 h-[1px] bg-slate-700"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 試合詳細表示（Matchデータ連携用）
+        window.showSessionDetail = function(sessionId, date) {
+            console.log("Details for:", sessionId);
+            // ここにMatch詳細モーダルの呼び出しを実装予定
+            alert(`${date} の全対局データ（Match）を表示します。モーダルを構築しましょう！`);
+        };
+
+        initHistory();
+    </script>
 </body>
 </html>

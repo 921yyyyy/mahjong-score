@@ -10,26 +10,17 @@
         body { background-color: #070d1c; color: #f1f5f9; font-family: 'Inter', sans-serif; }
         .gridjs-container { padding: 0; color: #1e293b; }
         .gridjs-wrapper { border-radius: 0; border: none; overflow-x: auto !important; }
-
-        /* 項目名（ヘッダー）の潰れ防止 */
         .gridjs-th {
             background-color: #041e42 !important; color: #ffffff !important;
             text-transform: uppercase; font-size: 9px !important;
-            letter-spacing: 0.05em; padding: 12px 5px !important; text-align: center !important;
-            min-width: 75px; /* 最小幅を確保 */
+            padding: 12px 5px !important; text-align: center !important;
+            min-width: 75px;
         }
-
-        /* 1列目(PLAYER)固定 & 不透明化 */
         .gridjs-td:first-child, .gridjs-th:first-child {
             position: sticky !important; left: 0; z-index: 10; min-width: 90px !important;
         }
         .gridjs-th:first-child { background-color: #041e42 !important; }
-        .gridjs-td:first-child {
-            background-color: #ffffff !important;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-        }
-
-        /* 縞々（ゼブラ柄）の復活 */
+        .gridjs-td:first-child { background-color: #ffffff !important; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
         .gridjs-td {
             background-color: #ffffff !important; color: #1e293b !important;
             font-weight: 800 !important; font-size: 11px !important;
@@ -38,36 +29,23 @@
         }
         .gridjs-tr:nth-child(odd) .gridjs-td { background-color: #f8fafc !important; }
         .gridjs-tr:nth-child(odd) .gridjs-td:first-child { background-color: #f8fafc !important; }
-
-        /* 並べ替え矢印を白く */
         .gridjs-sort { background-color: transparent !important; }
-        button.gridjs-sort-neutral, button.gridjs-sort-asc, button.gridjs-sort-desc {
-            filter: brightness(0) invert(1); opacity: 0.8;
-        }
-
-        /* PTSの色分け */
+        button.gridjs-sort-neutral, button.gridjs-sort-asc, button.gridjs-sort-desc { filter: brightness(0) invert(1); opacity: 0.8; }
         .pts-positive { color: #1d4ed8 !important; }
         .pts-negative { color: #be123c !important; }
-
-        /* タブデザイン */
         .tab-button { transition: all 0.3s ease; position: relative; opacity: 0.4; font-weight: 900; text-transform: uppercase; }
         .tab-button.active { opacity: 1; color: #f97316; }
         .tab-button.active::after {
             content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
             width: 20px; height: 3px; background: #f97316; border-radius: 2px;
         }
-
-        /* 検索窓のスタイル */
-        .gridjs-search-input {
-            background-color: #1e293b !important; border: 1px solid #334155 !important;
-            color: white !important; border-radius: 8px !important;
-        }
+        .gridjs-search-input { background-color: #1e293b !important; border: 1px solid #334155 !important; color: white !important; border-radius: 8px !important; }
     </style>
 </head>
 <body class="pb-24">
     <div class="max-w-4xl mx-auto">
         <header class="p-6 bg-gradient-to-b from-[#041e42] to-[#070d1c] border-b border-orange-500/30">
-            <h1 class="text-2xl font-black italic text-white uppercase mb-6 leading-none tracking-tighter text-white">Analysis Center</h1>
+            <h1 class="text-2xl font-black italic text-white uppercase mb-6 leading-none tracking-tighter">Analysis Center</h1>
             <div class="flex space-x-8">
                 <button onclick="changeTab('match')" id="btn-match" class="tab-button active text-xs tracking-widest">Match</button>
                 <button onclick="changeTab('session')" id="btn-session" class="tab-button text-xs tracking-widest">Session</button>
@@ -76,93 +54,78 @@
         <div id="mlb-grid-container" class="bg-white min-h-[400px]"></div>
     </div>
 
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gridjs/dist/gridjs.umd.js"></script>
-    <script src="navbar.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/gridjs/dist/gridjs.umd.js" defer></script>
+    <script src="navbar.js" defer></script>
 
-        <script>
-    const S_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
-    const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
-    const sb = window.supabase.createClient(S_URL, S_KEY);
+    <script>
+        // ライブラリの読み込みを待ってから実行
+        window.addEventListener('load', () => {
+            const S_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
+            const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
+            const sb = window.supabase.createClient(S_URL, S_KEY);
 
-    // MATCH（半荘）専用の取得・描画関数
-    async function renderMatchStats() {
-        const container = document.getElementById('mlb-grid-container');
-        container.innerHTML = "LOADING MATCH...";
-        const { data } = await sb.from('game_results').select('*');
-        
-        const stats = {};
-        data.forEach(r => {
-            const n = r.player_name;
-            if(!stats[n]) stats[n] = { n, g:0, sumR:0, pts:0, f:0, s:0, l:0, mx:-999 };
-            stats[n].g++;
-            stats[n].sumR += Number(r.rank);
-            stats[n].pts += Number(r.score);
-            if(r.rank==1) stats[n].f++;
-            if(r.rank==2) stats[n].s++;
-            if(r.rank==4) stats[n].l++;
-            if(r.score > stats[n].mx) stats[n].mx = r.score;
+            async function renderStats(mode) {
+                const container = document.getElementById('mlb-grid-container');
+                container.innerHTML = `<div class='p-10 text-slate-400 text-center font-bold'>LOADING ${mode.toUpperCase()}...</div>`;
+                
+                const tableName = mode === 'match' ? 'game_results' : 'set_summaries';
+                const { data, error } = await sb.from(tableName).select('*');
+                
+                if (error || !data) {
+                    container.innerHTML = "FETCH ERROR";
+                    return;
+                }
+
+                const stats = {};
+                data.forEach(r => {
+                    const n = r.player_name || 'Unknown';
+                    const rk = mode === 'match' ? Number(r.rank || 0) : Number(r.final_rank || 0);
+                    const sc = mode === 'match' ? Number(r.score || 0) : Number(r.total_score || 0);
+                    
+                    if(!stats[n]) stats[n] = { n, g:0, sumR:0, pts:0, f:0, s:0, l:0, mx:-999 };
+                    stats[n].g++;
+                    stats[n].sumR += rk;
+                    stats[n].pts += sc;
+                    if(rk==1) stats[n].f++;
+                    if(rk==2) stats[n].s++;
+                    if(rk==4) stats[n].l++;
+                    if(sc > stats[n].mx) stats[n].mx = sc;
+                });
+
+                const tableData = Object.values(stats).sort((a,b) => b.pts - a.pts).map(p => [
+                    p.n, p.g, (p.sumR/p.g).toFixed(2), p.f, 
+                    ((p.f/p.g)*100).toFixed(1)+'%', 
+                    (((p.f+p.s)/p.g)*100).toFixed(1)+'%',
+                    ((1-(p.l/p.g))*100).toFixed(1)+'%', 
+                    p.mx,
+                    gridjs.html(`<span class="${p.pts>0?'pts-positive':'pts-negative'}">${p.pts>0?'+'+p.pts:p.pts}</span>`)
+                ]);
+
+                const headers = mode === 'match' 
+                    ? ["PLAYER", "G", "AVG", "1ST", "TOP%", "REN%", "L-ESC%", "MAX", "PTS"]
+                    : ["PLAYER", "S-G", "S-AVG", "S-1ST", "S-TOP%", "S-REN%", "S-ESC%", "S-MAX", "S-PTS"];
+
+                container.innerHTML = '';
+                new gridjs.Grid({
+                    columns: headers.map(h => ({ name: h, sort: true })),
+                    data: tableData,
+                    search: true,
+                    fixedHeader: true,
+                    style: { table: { 'min-width': '650px' } }
+                }).render(container);
+            }
+
+            // グローバル関数として登録
+            window.changeTab = function(mode) {
+                document.getElementById('btn-match').classList.toggle('active', mode === 'match');
+                document.getElementById('btn-session').classList.toggle('active', mode === 'session');
+                renderStats(mode);
+            };
+
+            // 初回実行
+            renderStats('match');
         });
-
-        const tableData = Object.values(stats).sort((a,b) => b.pts - a.pts).map(p => [
-            p.n, p.g, (p.sumR/p.g).toFixed(2), p.f, 
-            ((p.f/p.g)*100).toFixed(1)+'%', (((p.f+p.s)/p.g)*100).toFixed(1)+'%',
-            ((1-(p.l/p.g))*100).toFixed(1)+'%', p.mx,
-            gridjs.html(`<span class="${p.pts>0?'pts-positive':'pts-negative'}">${p.pts>0?'+'+p.pts:p.pts}</span>`)
-        ]);
-
-        container.innerHTML = '';
-        new gridjs.Grid({
-            columns: ["PLAYER", "G", "AVG", "1ST", "TOP%", "REN%", "L-ESC%", "MAX", "PTS"],
-            data: tableData, sort: true, search: true, fixedHeader: true,
-            style: { table: { 'min-width': '650px' } }
-        }).render(container);
-    }
-
-    // SESSION（セット）専用の取得・描画関数
-    async function renderSessionStats() {
-        const container = document.getElementById('mlb-grid-container');
-        container.innerHTML = "LOADING SESSION...";
-        // テーブル名を明示的に指定
-        const { data } = await sb.from('set_summaries').select('*');
-        
-        const stats = {};
-        data.forEach(r => {
-            const n = r.player_name;
-            if(!stats[n]) stats[n] = { n, g:0, sumR:0, pts:0, f:0, s:0, l:0, mx:-999 };
-            stats[n].g++;
-            // カラム名を Session 専用のものに固定
-            stats[n].sumR += Number(r.final_rank);
-            stats[n].pts += Number(r.total_score);
-            if(r.final_rank==1) stats[n].f++;
-            if(r.final_rank==2) stats[n].s++;
-            if(r.final_rank==4) stats[n].l++;
-            if(r.total_score > stats[n].mx) stats[n].mx = r.total_score;
-        });
-
-        const tableData = Object.values(stats).sort((a,b) => b.pts - a.pts).map(p => [
-            p.n, p.g, (p.sumR/p.g).toFixed(2), p.f, 
-            ((p.f/p.g)*100).toFixed(1)+'%', (((p.f+p.s)/p.g)*100).toFixed(1)+'%',
-            ((1-(p.l/p.g))*100).toFixed(1)+'%', p.mx,
-            gridjs.html(`<span class="${p.pts>0?'pts-positive':'pts-negative'}">${p.pts>0?'+'+p.pts:p.pts}</span>`)
-        ]);
-
-        container.innerHTML = '';
-        new gridjs.Grid({
-            columns: ["PLAYER", "S-G", "S-AVG", "S-1ST", "S-TOP%", "S-REN%", "S-ESC%", "S-MAX", "S-PTS"],
-            data: tableData, sort: true, search: true, fixedHeader: true,
-            style: { table: { 'min-width': '650px' } }
-        }).render(container);
-    }
-
-    window.changeTab = function(mode) {
-        document.getElementById('btn-match').classList.toggle('active', mode === 'match');
-        document.getElementById('btn-session').classList.toggle('active', mode === 'session');
-        if(mode === 'match') renderMatchStats();
-        else renderSessionStats();
-    };
-
-    window.onload = renderMatchStats;
-</script>
+    </script>
 </body>
 </html>

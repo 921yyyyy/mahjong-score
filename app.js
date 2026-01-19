@@ -314,7 +314,7 @@ const updatePlayerSuggestions = async () => {
         }).select().single();
         if (gameError) throw gameError;
 
-        // --- 3. 半荘ごとの明細（game_results）をループ保存 ---
+                // --- 3. 半荘ごとの明細（game_results）をループ保存 ---
         const allGameResults = [];
         for (let r = 0; r < 8; r++) {
             const lineScores = [0, 1, 2, 3].map(p => (rawNumbers[r * 8 + p * 2] || 0) - (rawNumbers[r * 8 + p * 2 + 1] || 0));
@@ -322,21 +322,27 @@ const updatePlayerSuggestions = async () => {
             // 全員0（未入力行）ならスキップ
             if (lineScores.every(s => s === 0)) continue;
 
-            const lineRanks = getRanks(lineScores, false); // 案1: 起家優先
+            // 【重要】この半荘（Match）固有のIDを生成
+            const matchId = `match_${Date.now()}_${r}`;
+            const lineRanks = getRanks(lineScores, false); 
+
             names.forEach((name, i) => {
                 const pObj = playerData.find(pd => pd.name === name);
                 allGameResults.push({
                     game_id: gameData.id,
+                    match_id: matchId, // ← これを追加！
                     player_id: pObj ? pObj.id : null,
                     player_name: name,
                     score: lineScores[i],
-                    rank: lineRanks[i]
+                    rank: lineRanks[i],
+                    created_at: new Date().toISOString() // 同一時刻にする
                 });
             });
         }
         if (allGameResults.length > 0) {
             await supabase.from('game_results').insert(allGameResults);
         }
+
 
         // --- 4. 最終結果（set_summaries）を保存 ---
         const finalScores = [0, 1, 2, 3].map(p => {

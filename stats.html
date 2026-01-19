@@ -59,73 +59,90 @@
     <script src="navbar.js" defer></script>
 
     <script>
-        // ライブラリの読み込みを待ってから実行
-        window.addEventListener('load', () => {
-            const S_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
-            const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
-            const sb = window.supabase.createClient(S_URL, S_KEY);
+    window.addEventListener('load', () => {
+        const S_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
+        const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
+        const sb = window.supabase.createClient(S_URL, S_KEY);
 
-            async function renderStats(mode) {
-                const container = document.getElementById('mlb-grid-container');
-                container.innerHTML = `<div class='p-10 text-slate-400 text-center font-bold'>LOADING ${mode.toUpperCase()}...</div>`;
-                
-                const tableName = mode === 'match' ? 'game_results' : 'set_summaries';
-                const { data, error } = await sb.from(tableName).select('*');
-                
-                if (error || !data) {
-                    container.innerHTML = "FETCH ERROR";
-                    return;
-                }
+        let gridInstance = null; // 現在のGridインスタンスを保持
 
-                const stats = {};
-                data.forEach(r => {
-                    const n = r.player_name || 'Unknown';
-                    const rk = mode === 'match' ? Number(r.rank || 0) : Number(r.final_rank || 0);
-                    const sc = mode === 'match' ? Number(r.score || 0) : Number(r.total_score || 0);
-                    
-                    if(!stats[n]) stats[n] = { n, g:0, sumR:0, pts:0, f:0, s:0, l:0, mx:-999 };
-                    stats[n].g++;
-                    stats[n].sumR += rk;
-                    stats[n].pts += sc;
-                    if(rk==1) stats[n].f++;
-                    if(rk==2) stats[n].s++;
-                    if(rk==4) stats[n].l++;
-                    if(sc > stats[n].mx) stats[n].mx = sc;
-                });
-
-                const tableData = Object.values(stats).sort((a,b) => b.pts - a.pts).map(p => [
-                    p.n, p.g, (p.sumR/p.g).toFixed(2), p.f, 
-                    ((p.f/p.g)*100).toFixed(1)+'%', 
-                    (((p.f+p.s)/p.g)*100).toFixed(1)+'%',
-                    ((1-(p.l/p.g))*100).toFixed(1)+'%', 
-                    p.mx,
-                    gridjs.html(`<span class="${p.pts>0?'pts-positive':'pts-negative'}">${p.pts>0?'+'+p.pts:p.pts}</span>`)
-                ]);
-
-                const headers = mode === 'match' 
-                    ? ["PLAYER", "G", "AVG", "1ST", "TOP%", "REN%", "L-ESC%", "MAX", "PTS"]
-                    : ["PLAYER", "S-G", "S-AVG", "S-1ST", "S-TOP%", "S-REN%", "S-ESC%", "S-MAX", "S-PTS"];
-
-                container.innerHTML = '';
-                new gridjs.Grid({
-                    columns: headers.map(h => ({ name: h, sort: true })),
-                    data: tableData,
-                    search: true,
-                    fixedHeader: true,
-                    style: { table: { 'min-width': '650px' } }
-                }).render(container);
+        async function renderStats(mode) {
+            const container = document.getElementById('mlb-grid-container');
+            
+            // 1. 既存のGridを完全に破棄し、中身を空にする（これがないとフリーズします）
+            if (gridInstance) {
+                gridInstance.destroy(); 
+            }
+            container.innerHTML = `<div class='p-10 text-slate-400 text-center font-bold animate-pulse'>LOADING ${mode.toUpperCase()}...</div>`;
+            
+            const tableName = mode === 'match' ? 'game_results' : 'set_summaries';
+            
+            // 2. データの取得（キャッシュ回避のためタイムスタンプをダミーで付与）
+            const { data, error } = await sb.from(tableName).select('*');
+            
+            if (error || !data) {
+                container.innerHTML = "<div class='p-10 text-red-500'>FETCH ERROR</div>";
+                return;
             }
 
-            // グローバル関数として登録
-            window.changeTab = function(mode) {
-                document.getElementById('btn-match').classList.toggle('active', mode === 'match');
-                document.getElementById('btn-session').classList.toggle('active', mode === 'session');
-                renderStats(mode);
-            };
+            const stats = {};
+            data.forEach(r => {
+                const n = r.player_name || 'Unknown';
+                // カラム名の使い分け
+                const rk = mode === 'match' ? Number(r.rank || 0) : Number(r.final_rank || 0);
+                const sc = mode === 'match' ? Number(r.score || 0) : Number(r.total_score || 0);
+                
+                if(!stats[n]) stats[n] = { n, g:0, sumR:0, pts:0, f:0, s:0, l:0, mx:-999 };
+                stats[n].g++;
+                stats[n].sumR += rk;
+                stats[n].pts += sc;
+                if(rk === 1) stats[n].f++;
+                if(rk === 2) stats[n].s++;
+                if(rk === 4) stats[n].l++;
+                if(sc > stats[n].mx) stats[n].mx = sc;
+            });
 
-            // 初回実行
-            renderStats('match');
-        });
-    </script>
+            const tableData = Object.values(stats).sort((a,b) => b.pts - a.pts).map(p => [
+                p.n, p.g, (p.sumR/p.g).toFixed(2), p.f, 
+                ((p.f/p.g)*100).toFixed(1)+'%', 
+                (((p.f+p.s)/p.g)*100).toFixed(1)+'%',
+                ((1-(p.l/p.g))*100).toFixed(1)+'%', 
+                p.mx,
+                gridjs.html(`<span class="${p.pts>0?'pts-positive':'pts-negative'}">${p.pts>0?'+'+p.pts:p.pts}</span>`)
+            ]);
+
+            const headers = mode === 'match' 
+                ? ["PLAYER", "G", "AVG", "1ST", "TOP%", "REN%", "L-ESC%", "MAX", "PTS"]
+                : ["PLAYER", "S-G", "S-AVG", "S-1ST", "S-TOP%", "S-REN%", "S-ESC%", "S-MAX", "S-PTS"];
+
+            container.innerHTML = '';
+            
+            // 3. 新しいインスタンスを生成して保持
+            gridInstance = new gridjs.Grid({
+                columns: headers.map(h => ({ 
+                    name: h, 
+                    sort: { enabled: true },
+                    // 数値列は数値としてソートするように指定（オプション）
+                })),
+                data: tableData,
+                search: true,
+                fixedHeader: true,
+                style: { table: { 'min-width': '650px' } },
+                language: { 'search': { 'placeholder': '選手名検索...' } }
+            });
+            
+            gridInstance.render(container);
+        }
+
+        window.changeTab = function(mode) {
+            document.getElementById('btn-match').classList.toggle('active', mode === 'match');
+            document.getElementById('btn-session').classList.toggle('active', mode === 'session');
+            renderStats(mode);
+        };
+
+        renderStats('match');
+    });
+</script>
+
 </body>
 </html>

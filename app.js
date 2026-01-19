@@ -11,12 +11,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         const options = players ? players.map(p => ({ value: p.name, text: p.name })) : [];
 
         ['pA', 'pB', 'pC', 'pD'].forEach(id => {
-            playerSelects[id] = new TomSelect(`#${id}`, {
-                options: options,
-                create: true, // 新規プレイヤーはその場で登録可能に
-                maxItems: 1,
-                onChange: () => validateAll()
-            });
+           // app.js 内の TomSelect 初期化部分を以下のように微調整
+playerSelects[id] = new TomSelect(`#${id}`, {
+    options: options,
+    create: true,
+    maxItems: 1,
+    // 追加：新規作成時の表示をよりリッチにする
+    render: {
+        option_create: function(data, escape) {
+            return '<div class="create">ADD NEW ROSTER: <strong>' + escape(data.input) + '</strong></div>';
+        },
+        no_results: function(data, escape) {
+            return '<div class="no-results" style="padding: 10px; color: #64748b; font-size: 10px;">PRESS ENTER TO ADD "' + escape(data.input) + '"</div>';
+        }
+    },
+    onChange: () => validateAll()
+});
+
         });
     }
 

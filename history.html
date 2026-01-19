@@ -3,23 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🀄 対局履歴 - MS PRO</title>
+    <title>HISTORY | MLB Mahjong</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+    <style>
+        body { background-color: #070d1c; color: white; font-family: 'Inter', sans-serif; }
+        
+        /* MLBスコアボード風カード */
+        .game-card {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-left: 4px solid #f97316;
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+        }
+
+        .rank-badge {
+            width: 32px; height: 32px;
+            display: flex; items-center; justify-content: center;
+            border-radius: 50%; font-weight: 900; font-style: italic;
+        }
+        .rank-1 { background: #facc15; color: #000; } /* GOLD */
+        .rank-2 { background: #cbd5e1; color: #000; } /* SILVER */
+        .rank-4 { background: #ef4444; color: #fff; } /* RED (LAST) */
+
+        .swiper { width: 100%; padding-top: 20px; padding-bottom: 50px; }
+        .swiper-slide {
+            background-position: center; background-size: cover;
+            width: 300px; /* カードの幅 */
+        }
+    </style>
 </head>
-<body class="p-4 bg-slate-900 text-slate-100 pb-24">
-    <div class="max-w-xl mx-auto space-y-6">
-        <header class="flex justify-between items-center">
-            <h1 class="text-xl font-black text-orange-400">PAST GAMES</h1>
-            <a href="index.html" class="text-xs bg-slate-800 px-4 py-2 rounded-full border border-slate-700">← 戻る</a>
+<body class="pb-24">
+    <div class="max-w-4xl mx-auto p-4">
+        <header class="mb-8">
+            <h1 class="text-3xl font-black italic uppercase tracking-tighter border-b-2 border-orange-500 inline-block">Game History</h1>
+            <p class="text-[10px] text-slate-400 mt-2 tracking-[0.2em] uppercase">Season 2026 Archive</p>
         </header>
 
-        <div id="historyList" class="space-y-4">
-            <div class="text-center py-10 text-slate-500">データを読み込み中...</div>
-        </div>
+        <section class="mb-10">
+            <h2 class="text-xs font-bold text-orange-400 mb-4 uppercase tracking-widest">Recent Highlights</h2>
+            <div class="swiper mySwiper">
+                <div class="swiper-wrapper" id="history-swiper-wrapper">
+                    </div>
+                <div class="swiper-pagination"></div>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="text-xs font-bold text-orange-400 mb-4 uppercase tracking-widest">All Records</h2>
+            <div id="history-list" class="space-y-4">
+                </div>
+        </section>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+    <script src="navbar.js"></script>
     <script src="history.js"></script>
-        <script src="navbar.js"></script>
 </body>
 </html>

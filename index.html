@@ -17,6 +17,28 @@
         .ts-control { background: #0a0f1a !important; color: white !important; border: 1px solid #f9731644 !important; height: 50px; padding: 10px !important; font-weight: 800; }
         .ts-dropdown { background: #161e2d !important; color: white !important; border: 1px solid #f9731644 !important; }
         .ts-dropdown .active { background: #f97316 !important; }
+        /* Tom Select 入力中の文字色を白に固定し、背景とのコントラストを確保 */
+.ts-control input {
+    color: white !important;
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 800 !important;
+}
+
+/* 「Add xxx...」という新規登録用項目の見た目をMLB風に強化 */
+.ts-dropdown .create {
+    background: #f97316 !important; /* オレンジ背景 */
+    color: white !important;
+    font-weight: 900 !important;
+    text-transform: uppercase;
+    font-style: italic;
+    padding: 10px !important;
+}
+
+/* 入力中のプレースホルダー（うっすら見える文字）の色調整 */
+.ts-control input::placeholder {
+    color: rgba(255, 255, 255, 0.3) !important;
+}
+
         /* Tabulator カスタム */
         .tabulator { background: transparent !important; border: none !important; }
         .tabulator-header { background: #161e2d !important; color: #64748b !important; font-size: 10px !important; border-bottom: 2px solid #f97316 !important; }

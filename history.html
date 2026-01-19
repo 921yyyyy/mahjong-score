@@ -106,7 +106,6 @@
         }
 
         function createSessionCard(players, date) {
-            // session_idがあればそれを使う、なければ日付をキーにする
             const sId = players[0].session_id || date;
             return `
                 <div class="game-card p-5" onclick="showSessionDetail('${sId}', '${date}')">
@@ -133,90 +132,78 @@
         }
 
         window.showSessionDetail = async function(sId, date) {
-    const modal = document.getElementById('detail-modal');
-    const content = document.getElementById('modal-content');
-    const dateLabel = document.getElementById('modal-date');
-    
-    dateLabel.innerText = date;
-    content.innerHTML = "<div class='p-10 text-center animate-pulse'>LOADING MATCH DATA...</div>";
-    modal.classList.add('active');
-
-    try {
-        // 1. その日の全 Match データを取得
-        // session_id がある場合はそれを優先、ない場合は日付範囲で検索
-        let query = sb.from('game_results').select('*');
-        if (sId.includes('/') || sId.includes('-')) { 
-            // 日付形式（2026/01/20等）の場合、その日の0:00〜23:59を取得
-            const dayStart = new Date(date).setHours(0,0,0,0);
-            const dayEnd = new Date(date).setHours(23,59,59,999);
-            query = query.gte('created_at', new Date(dayStart).toISOString())
-                         .lte('created_at', new Date(dayEnd).toISOString());
-        } else {
-            query = query.eq('session_id', sId);
-        }
-
-        const { data: matches, error } = await query.order('created_at', { ascending: true });
-        if (error) throw error;
-
-        // 2. 【重要】match_id でグループ化し、半荘の塊を作る
-        const grouped = {};
-        matches.forEach(m => {
-            // match_id が空の場合は created_at (秒まで) をキーにして同じ対局を特定
-            const mId = m.match_id || new Date(m.created_at).getTime();
-            if(!grouped[mId]) grouped[mId] = [];
-            grouped[mId].push(m);
-        });
-
-        content.innerHTML = "";
-        
-        // 3. 半荘（Match）ごとにカードを出力
-        const matchKeys = Object.keys(grouped);
-        if (matchKeys.length === 0) {
-            content.innerHTML = "<div class='text-center text-slate-500'>No match data found.</div>";
-            return;
-        }
-
-        matchKeys.forEach((mId, i) => {
-            const players = grouped[mId].sort((a,b) => a.rank - b.rank); // その半荘内での順位順
+            const modal = document.getElementById('detail-modal');
+            const content = document.getElementById('modal-content');
+            const dateLabel = document.getElementById('modal-date');
             
-            const matchCard = `
-                <div class="bg-white/5 rounded-lg overflow-hidden border border-white/10 mb-6">
-                    <div class="bg-white/10 px-4 py-2 flex justify-between items-center">
-                        <span class="text-[10px] font-black uppercase tracking-widest text-orange-400">Match #${i+1}</span>
-                        <span class="text-[9px] text-slate-500 font-mono">${new Date(players[0].created_at).toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'})}</span>
-                    </div>
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="text-[8px] text-slate-500 uppercase border-b border-white/5">
-                                <th class="p-3 w-16">Rank</th>
-                                <th class="p-3">Player</th>
-                                <th class="p-3 text-right">Score</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${players.map(p => `
-                                <tr class="border-b border-white/5 last:border-0">
-                                    <td class="p-3 text-lg font-black italic ${p.rank==1?'rank-gold': (p.rank==4?'text-red-500':'text-slate-400')}">
-                                        ${p.rank}
-                                    </td>
-                                    <td class="p-3 text-xs font-bold text-slate-200">${p.player_name}</td>
-                                    <td class="p-3 text-right font-mono font-bold ${p.score>=0?'text-blue-400':'text-red-400'}">
-                                        ${p.score>0?'+':''}${p.score}
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>`;
-            content.innerHTML += matchCard;
-        });
+            dateLabel.innerText = date;
+            content.innerHTML = "<div class='p-10 text-center animate-pulse'>LOADING MATCH DATA...</div>";
+            modal.classList.add('active');
 
-    } catch (e) { 
-        console.error(e);
-        content.innerHTML = "<div class='p-10 text-red-500 text-center'>ERROR LOADING DATA</div>"; 
-    }
-}
+            try {
+                // その日の0:00〜23:59を取得してフィルタリング
+                const dayStart = new Date(date).setHours(0,0,0,0);
+                const dayEnd = new Date(date).setHours(23,59,59,999);
+                
+                const { data: matches, error } = await sb.from('game_results')
+                    .select('*')
+                    .gte('created_at', new Date(dayStart).toISOString())
+                    .lte('created_at', new Date(dayEnd).toISOString())
+                    .order('created_at', { ascending: true });
 
+                if (error) throw error;
+
+                // match_id（またはcreated_at）でグループ化して1試合ずつの塊を作る
+                const grouped = {};
+                matches.forEach(m => {
+                    const id = m.match_id || m.created_at; 
+                    if(!grouped[id]) grouped[id] = [];
+                    grouped[id].push(m);
+                });
+
+                content.innerHTML = "";
+                const matchKeys = Object.keys(grouped);
+                
+                if (matchKeys.length === 0) {
+                    content.innerHTML = "<div class='text-center text-slate-500'>No match data found.</div>";
+                    return;
+                }
+
+                matchKeys.forEach((mId, i) => {
+                    const players = grouped[mId].sort((a,b) => a.rank - b.rank);
+                    const matchCard = `
+                        <div class="bg-white/5 rounded-lg overflow-hidden border border-white/10 mb-6">
+                            <div class="bg-white/10 px-4 py-2 flex justify-between items-center">
+                                <span class="text-[10px] font-black uppercase tracking-widest text-orange-400">Match #${i+1}</span>
+                                <span class="text-[9px] text-slate-500 font-mono">${new Date(players[0].created_at).toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'})}</span>
+                            </div>
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="text-[8px] text-slate-500 uppercase border-b border-white/5">
+                                        <th class="p-3 w-16">Rank</th>
+                                        <th class="p-3">Player</th>
+                                        <th class="p-3 text-right">Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${players.map(p => `
+                                        <tr class="border-b border-white/5 last:border-0">
+                                            <td class="p-3 text-lg font-black italic ${p.rank==1?'rank-gold': (p.rank==4?'text-red-500':'text-slate-400')}">${p.rank}</td>
+                                            <td class="p-3 text-xs font-bold text-slate-200">${p.player_name}</td>
+                                            <td class="p-3 text-right font-mono font-bold ${p.score>=0?'text-blue-400':'text-red-400'}">${p.score>0?'+':''}${p.score}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>`;
+                    content.innerHTML += matchCard;
+                });
+
+            } catch (e) { 
+                console.error(e);
+                content.innerHTML = "<div class='p-10 text-red-500 text-center'>ERROR LOADING DATA</div>"; 
+            }
+        }
 
         window.closeModal = function() {
             document.getElementById('detail-modal').classList.remove('active');

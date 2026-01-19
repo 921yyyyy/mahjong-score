@@ -2,104 +2,61 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SCANNER | Professional Analysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>STATS ENTRY | PRO</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator_midnight.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+    
     <style>
         body { background-color: #070d1c; color: white; font-family: 'Inter', sans-serif; }
-        .canvas-container { border: 1px solid rgba(255,255,255,0.1); background: #000; border-radius: 16px; overflow: hidden; }
-        .mlb-gradient { background: linear-gradient(180deg, #161e2d 0%, #0a0f1a 100%); }
-        input[type="number"] { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: white; }
-        .score-plus { color: #60a5fa; font-weight: 800; }
-        .score-minus { color: #f87171; font-weight: 800; }
-        /* スライダーカスタム */
-        input[type="range"] { accent-color: #f97316; }
+        .mlb-card { background: linear-gradient(180deg, #161e2d 0%, #0a0f1a 100%); border: 1px solid rgba(255,255,255,0.05); }
+        /* Tom Select カスタム */
+        .ts-control { background: #0a0f1a !important; color: white !important; border: 1px solid #f9731644 !important; height: 50px; padding: 10px !important; font-weight: 800; }
+        .ts-dropdown { background: #161e2d !important; color: white !important; border: 1px solid #f9731644 !important; }
+        .ts-dropdown .active { background: #f97316 !important; }
+        /* Tabulator カスタム */
+        .tabulator { background: transparent !important; border: none !important; }
+        .tabulator-header { background: #161e2d !important; color: #64748b !important; font-size: 10px !important; border-bottom: 2px solid #f97316 !important; }
+        .tabulator-row { background: transparent !important; border-bottom: 1px solid rgba(255,255,255,0.05) !important; }
+        .tabulator-cell { padding: 12px !important; font-weight: 800; font-family: 'Roboto Mono', monospace; }
+        .invalid-row { background-color: rgba(239, 68, 68, 0.1) !important; }
     </style>
 </head>
-<body class="pb-24">
+<body class="pb-32">
     <div class="max-w-xl mx-auto p-4 space-y-6">
-        <header class="pt-6 flex justify-between items-center">
-            <div>
-                <span class="text-[10px] text-orange-500 font-black tracking-[0.3em] uppercase block mb-1">Optical Analysis</span>
-                <h1 class="text-3xl font-black italic uppercase tracking-tighter border-b-2 border-orange-500 inline-block leading-none pb-1">Scanner</h1>
-            </div>
-            <a href="history.html" class="bg-white/5 p-3 rounded-full border border-white/10">
-                <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </a>
+        <header class="pt-6">
+            <span class="text-[10px] text-orange-500 font-black tracking-[0.3em] uppercase block mb-1">Data Collection</span>
+            <h1 class="text-3xl font-black italic uppercase tracking-tighter border-b-2 border-orange-500 inline-block leading-none pb-1">Entry</h1>
         </header>
 
-        <div class="mlb-gradient p-6 rounded-2xl border border-white/5 shadow-2xl space-y-4">
-            <input type="file" id="imageInput" accept="image/*" class="hidden">
-            <button onclick="document.getElementById('imageInput').click()" class="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl shadow-lg shadow-orange-900/20 transition-all active:scale-95">
-                UPLOAD SCORE SHEET
-            </button>
+        <section class="mlb-card p-5 rounded-2xl shadow-2xl space-y-4">
+            <h2 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <span class="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>Active Roster
+            </h2>
             <div class="grid grid-cols-2 gap-3">
-                <button id="rotateBtn" class="py-3 bg-white/5 text-xs font-bold rounded-xl border border-white/10 uppercase tracking-widest">Rotate ↺</button>
-                <button id="analyzeBtn" class="py-3 bg-indigo-600 text-xs font-bold rounded-xl shadow-lg uppercase tracking-widest">Start Scan 🎯</button>
+                <select id="pA" class="roster-select" placeholder="SELECT A"></select>
+                <select id="pB" class="roster-select" placeholder="SELECT B"></select>
+                <select id="pC" class="roster-select" placeholder="SELECT C"></select>
+                <select id="pD" class="roster-select" placeholder="SELECT D"></select>
+            </div>
+        </section>
+
+        <div class="mlb-card rounded-2xl overflow-hidden shadow-2xl">
+            <div id="score-table"></div>
+            <div class="p-3 bg-white/5 flex justify-between items-center">
+                <button id="add-row" class="text-[10px] font-black text-orange-500 border border-orange-500/30 px-4 py-2 rounded-full active:scale-95 transition-all">+ NEW MATCH</button>
+                <div id="status-badge" class="text-[9px] font-mono text-slate-500 uppercase">Checking Integrity...</div>
             </div>
         </div>
 
-        <div class="bg-black/40 p-5 rounded-2xl border border-white/5 grid grid-cols-2 gap-4">
-            <div class="space-y-1">
-                <div class="flex justify-between text-[9px] font-bold text-slate-500 uppercase"><span>Width</span><span id="valW" class="text-orange-500">1.0</span></div>
-                <input type="range" id="adjustW" min="0.5" max="3.5" step="0.01" value="1.0" class="w-full">
-            </div>
-            <div class="space-y-1">
-                <div class="flex justify-between text-[9px] font-bold text-slate-500 uppercase"><span>Height</span><span id="valH" class="text-orange-500">1.0</span></div>
-                <input type="range" id="adjustH" min="0.5" max="2.5" step="0.01" value="1.0" class="w-full">
-            </div>
-            <div class="space-y-1">
-                <input type="range" id="adjustX" min="-500" max="800" value="0" class="w-full">
-            </div>
-            <div class="space-y-1">
-                <input type="range" id="adjustY" min="-800" max="800" value="0" class="w-full">
-            </div>
-        </div>
-
-        <div class="canvas-container shadow-2xl">
-            <canvas id="previewCanvas"></canvas>
-        </div>
-
-        <div class="mlb-gradient rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-            <div class="grid grid-cols-[40px_1fr_1fr_1fr_1fr] bg-white/10 text-[9px] font-black uppercase tracking-tighter text-slate-400">
-                <div class="p-2 text-center">No</div>
-                <div class="p-2 text-center">Player A</div>
-                <div class="p-2 text-center">Player B</div>
-                <div class="p-2 text-center">Player C</div>
-                <div class="p-2 text-center">Player D</div>
-            </div>
-            <div id="gridBody" class="divide-y divide-white/5">
-                </div>
-            <div class="grid grid-cols-[40px_1fr_1fr_1fr_1fr] bg-orange-600/10 p-3 font-mono font-bold text-xs border-t border-orange-500/30">
-                <div class="text-center text-orange-500 italic">Σ</div>
-                <div id="totalA" class="text-center">0</div>
-                <div id="totalB" class="text-center">0</div>
-                <div id="totalC" class="text-center">0</div>
-                <div id="totalD" class="text-center">0</div>
-            </div>
-        </div>
-
-        <button id="saveData" class="w-full py-5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:grayscale">
-            FINALIZE & SAVE TO CLOUD
+        <button id="submit-btn" class="w-full py-5 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-2xl shadow-xl shadow-orange-900/20 transition-all active:scale-95 disabled:opacity-20 disabled:grayscale">
+            FINALIZE & UPLOAD
         </button>
     </div>
 
-    <div id="cloudModal" style="display:none;" class="fixed inset-0 bg-[#070d1c]/95 z-50 flex items-center justify-center p-6 backdrop-blur-md">
-        <div class="bg-[#161e2d] w-full max-w-sm p-8 rounded-3xl border border-white/10 shadow-2xl space-y-6">
-            <div class="text-center">
-                <span class="text-orange-500 text-[10px] font-black tracking-widest uppercase">Roster Selection</span>
-                <h2 class="text-2xl font-black italic uppercase tracking-tighter">Enter Names</h2>
-            </div>
-            <div id="playerInputs" class="space-y-4"></div>
-            <div class="flex gap-3 pt-4">
-                <button onclick="document.getElementById('cloudModal').style.display='none'" class="flex-1 py-4 bg-white/5 rounded-xl font-bold text-xs uppercase tracking-widest border border-white/10">Cancel</button>
-                <button id="dbSubmitBtn" class="flex-1 py-4 bg-orange-600 rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-orange-900/40">Confirm Save</button>
-            </div>
-        </div>
-    </div>
-
-    <datalist id="playerHistory"></datalist>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
     <script src="navbar.js"></script>

@@ -3,118 +3,105 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🀄 高精度解析 (Professional Edition)</title>
+    <title>SCANNER | Professional Analysis</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
-        body { background-color: #0f172a; color: #f1f5f9; font-family: 'Helvetica Neue', Arial, sans-serif; }
-        .canvas-container { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid #334155; }
-        #previewCanvas { width: 100%; display: block; }
-        input[type="number"] { -moz-appearance: textfield; background: transparent; font-weight: bold; outline: none; }
-        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type="range"] { height: 10px; border-radius: 5px; background: #334155; accent-color: #f97316; width: 100%; cursor: pointer; }
-        
-        /* 本格スコアボード用スタイル */
-        .score-grid { display: grid; grid-template-columns: 30px repeat(4, 1fr); gap: 1px; background-color: #cbd5e1; border: 2px solid #64748b; }
-        .grid-header { background-color: #475569; color: white; padding: 4px; text-align: center; font-size: 10px; font-weight: 900; }
-        .grid-cell { background-color: white; padding: 2px; display: flex; gap: 1px; }
-        .cell-num { background-color: #f8fafc; display: flex; items-center; justify-center; font-size: 10px; color: #94a3b8; font-weight: bold; }
-        .input-plus { background-color: #eff6ff !important; color: #1d4ed8; } /* プラスは青系 */
-        .input-minus { background-color: #fff1f2 !important; color: #be123c; } /* マイナスは赤系 */
+        body { background-color: #070d1c; color: white; font-family: 'Inter', sans-serif; }
+        .canvas-container { border: 1px solid rgba(255,255,255,0.1); background: #000; border-radius: 16px; overflow: hidden; }
+        .mlb-gradient { background: linear-gradient(180deg, #161e2d 0%, #0a0f1a 100%); }
+        input[type="number"] { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: white; }
+        .score-plus { color: #60a5fa; font-weight: 800; }
+        .score-minus { color: #f87171; font-weight: 800; }
+        /* スライダーカスタム */
+        input[type="range"] { accent-color: #f97316; }
     </style>
 </head>
-<body class="p-2 sm:p-4 pb-24">
-    <div class="max-w-xl mx-auto space-y-4">
-        <header class="p-3 bg-slate-800 rounded-2xl border border-slate-700 shadow-xl flex items-center justify-center gap-3">
-            <span class="text-2xl">🀄</span>
-            <h1 class="text-lg font-black text-orange-400 tracking-widest">MAHJONG SCANNER PRO</h1>
+<body class="pb-24">
+    <div class="max-w-xl mx-auto p-4 space-y-6">
+        <header class="pt-6 flex justify-between items-center">
+            <div>
+                <span class="text-[10px] text-orange-500 font-black tracking-[0.3em] uppercase block mb-1">Optical Analysis</span>
+                <h1 class="text-3xl font-black italic uppercase tracking-tighter border-b-2 border-orange-500 inline-block leading-none pb-1">Scanner</h1>
+            </div>
+            <a href="history.html" class="bg-white/5 p-3 rounded-full border border-white/10">
+                <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </a>
         </header>
-<div class="flex justify-end px-1">
-    <a href="history.html" class="text-[10px] font-bold bg-slate-800 text-orange-400 px-4 py-2 rounded-full border border-orange-500/30 transition-active active:scale-95">
-        📊 履歴を表示
-    </a>
-</div>
-        <div class="p-4 bg-slate-800 rounded-2xl shadow-lg space-y-4 border border-slate-700">
+
+        <div class="mlb-gradient p-6 rounded-2xl border border-white/5 shadow-2xl space-y-4">
             <input type="file" id="imageInput" accept="image/*" class="hidden">
-            <button onclick="document.getElementById('imageInput').click()" class="w-full py-4 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl shadow-lg transition-transform active:scale-95">
-                📁 写真をアップロード
+            <button onclick="document.getElementById('imageInput').click()" class="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl shadow-lg shadow-orange-900/20 transition-all active:scale-95">
+                UPLOAD SCORE SHEET
             </button>
             <div class="grid grid-cols-2 gap-3">
-                <button id="rotateBtn" class="py-3 bg-slate-700 text-white font-bold rounded-xl border border-slate-600">↺ 角度調整</button>
-                <button id="analyzeBtn" class="py-3 bg-orange-500 text-white font-bold rounded-xl shadow-lg shadow-orange-500/20">🎯 スキャン開始</button>
+                <button id="rotateBtn" class="py-3 bg-white/5 text-xs font-bold rounded-xl border border-white/10 uppercase tracking-widest">Rotate ↺</button>
+                <button id="analyzeBtn" class="py-3 bg-indigo-600 text-xs font-bold rounded-xl shadow-lg uppercase tracking-widest">Start Scan 🎯</button>
             </div>
         </div>
 
-        <div class="p-5 bg-slate-900 rounded-2xl border border-orange-500/30 space-y-5">
-            <div class="grid grid-cols-2 gap-x-6 gap-y-4">
-                <div class="space-y-1">
-                    <div class="flex justify-between items-center"><span class="text-[10px] text-slate-400 font-bold">左右(X)</span><span id="valX" class="text-[10px] text-orange-400">0</span></div>
-                    <input type="range" id="adjustX" min="-500" max="800" value="0">
-                </div>
-                <div class="space-y-1">
-                    <div class="flex justify-between items-center"><span class="text-[10px] text-slate-400 font-bold">上下(Y)</span><span id="valY" class="text-[10px] text-orange-400">0</span></div>
-                    <input type="range" id="adjustY" min="-800" max="800" value="0">
-                </div>
-                <div class="space-y-1">
-                    <div class="flex justify-between items-center"><span class="text-[10px] text-slate-400 font-bold text-orange-300">★横幅(W)</span><span id="valW" class="text-[10px] text-orange-400">1.0</span></div>
-                    <input type="range" id="adjustW" min="0.5" max="3.5" step="0.01" value="1.0">
-                </div>
-                <div class="space-y-1">
-                    <div class="flex justify-between items-center"><span class="text-[10px] text-slate-400 font-bold">高さ(H)</span><span id="valH" class="text-[10px] text-orange-400">1.0</span></div>
-                    <input type="range" id="adjustH" min="0.5" max="2.5" step="0.01" value="1.0">
-                </div>
+        <div class="bg-black/40 p-5 rounded-2xl border border-white/5 grid grid-cols-2 gap-4">
+            <div class="space-y-1">
+                <div class="flex justify-between text-[9px] font-bold text-slate-500 uppercase"><span>Width</span><span id="valW" class="text-orange-500">1.0</span></div>
+                <input type="range" id="adjustW" min="0.5" max="3.5" step="0.01" value="1.0" class="w-full">
+            </div>
+            <div class="space-y-1">
+                <div class="flex justify-between text-[9px] font-bold text-slate-500 uppercase"><span>Height</span><span id="valH" class="text-orange-500">1.0</span></div>
+                <input type="range" id="adjustH" min="0.5" max="2.5" step="0.01" value="1.0" class="w-full">
+            </div>
+            <div class="space-y-1">
+                <input type="range" id="adjustX" min="-500" max="800" value="0" class="w-full">
+            </div>
+            <div class="space-y-1">
+                <input type="range" id="adjustY" min="-800" max="800" value="0" class="w-full">
             </div>
         </div>
 
-        <div class="canvas-container shadow-2xl shadow-black/50">
+        <div class="canvas-container shadow-2xl">
             <canvas id="previewCanvas"></canvas>
         </div>
 
-        <div id="debugLog" class="h-24 p-3 bg-black/80 text-emerald-400 text-[10px] font-mono overflow-y-auto border border-emerald-900/30 rounded-xl backdrop-blur-sm">
-            -- STANDBY --
-        </div>
-
-        <div class="rounded-xl overflow-hidden shadow-2xl border-2 border-slate-700">
-            <div class="score-grid">
-                <div class="grid-header flex items-center justify-center">回</div>
-                <div class="grid-header">Aさん<br><span class="text-[8px] opacity-70">＋ / －</span></div>
-                <div class="grid-header">Bさん<br><span class="text-[8px] opacity-70">＋ / －</span></div>
-                <div class="grid-header">Cさん<br><span class="text-[8px] opacity-70">＋ / －</span></div>
-                <div class="grid-header">Dさん<br><span class="text-[8px] opacity-70">＋ / －</span></div>
-                
-                <div id="gridBody" class="contents text-slate-800"></div>
-
-                <div class="bg-slate-200 py-3 text-[10px] font-black flex items-center justify-center border-t border-slate-400">計</div>
-                <div id="totalA" class="bg-slate-50 py-3 text-center font-black text-sm border-t border-slate-400">0</div>
-                <div id="totalB" class="bg-slate-50 py-3 text-center font-black text-sm border-t border-slate-400">0</div>
-                <div id="totalC" class="bg-slate-50 py-3 text-center font-black text-sm border-t border-slate-400">0</div>
-                <div id="totalD" class="bg-slate-50 py-3 text-center font-black text-sm border-t border-slate-400">0</div>
+        <div class="mlb-gradient rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+            <div class="grid grid-cols-[40px_1fr_1fr_1fr_1fr] bg-white/10 text-[9px] font-black uppercase tracking-tighter text-slate-400">
+                <div class="p-2 text-center">No</div>
+                <div class="p-2 text-center">Player A</div>
+                <div class="p-2 text-center">Player B</div>
+                <div class="p-2 text-center">Player C</div>
+                <div class="p-2 text-center">Player D</div>
+            </div>
+            <div id="gridBody" class="divide-y divide-white/5">
+                </div>
+            <div class="grid grid-cols-[40px_1fr_1fr_1fr_1fr] bg-orange-600/10 p-3 font-mono font-bold text-xs border-t border-orange-500/30">
+                <div class="text-center text-orange-500 italic">Σ</div>
+                <div id="totalA" class="text-center">0</div>
+                <div id="totalB" class="text-center">0</div>
+                <div id="totalC" class="text-center">0</div>
+                <div id="totalD" class="text-center">0</div>
             </div>
         </div>
 
-                <button id="saveData" class="w-full py-5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-xl transition-all active:scale-95">
-            💾 結果をクラウドに保存
+        <button id="saveData" class="w-full py-5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:grayscale">
+            FINALIZE & SAVE TO CLOUD
         </button>
     </div>
 
-    <div id="cloudModal" style="display:none;" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-slate-800 w-full max-w-sm p-6 rounded-3xl border border-slate-700 shadow-2xl space-y-6">
-            <h2 class="text-center font-bold text-orange-400">対局者を決定</h2>
+    <div id="cloudModal" style="display:none;" class="fixed inset-0 bg-[#070d1c]/95 z-50 flex items-center justify-center p-6 backdrop-blur-md">
+        <div class="bg-[#161e2d] w-full max-w-sm p-8 rounded-3xl border border-white/10 shadow-2xl space-y-6">
+            <div class="text-center">
+                <span class="text-orange-500 text-[10px] font-black tracking-widest uppercase">Roster Selection</span>
+                <h2 class="text-2xl font-black italic uppercase tracking-tighter">Enter Names</h2>
+            </div>
             <div id="playerInputs" class="space-y-4"></div>
-            <div class="flex gap-3 pt-2">
-                <button onclick="document.getElementById('cloudModal').style.display='none'" class="flex-1 py-3 bg-slate-700 rounded-xl font-bold text-xs">キャンセル</button>
-                <button id="dbSubmitBtn" class="flex-1 py-3 bg-emerald-500 rounded-xl font-bold text-xs">DBに保存</button>
+            <div class="flex gap-3 pt-4">
+                <button onclick="document.getElementById('cloudModal').style.display='none'" class="flex-1 py-4 bg-white/5 rounded-xl font-bold text-xs uppercase tracking-widest border border-white/10">Cancel</button>
+                <button id="dbSubmitBtn" class="flex-1 py-4 bg-orange-600 rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-orange-900/40">Confirm Save</button>
             </div>
         </div>
     </div>
+
     <datalist id="playerHistory"></datalist>
-
-       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
-<datalist id="playerHistory"></datalist>
     <script src="navbar.js"></script>
-
-    </body>
+</body>
 </html>
-

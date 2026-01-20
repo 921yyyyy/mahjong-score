@@ -13,91 +13,68 @@
     <style>
         body { background-color: #070d1c; color: white; font-family: 'Inter', sans-serif; }
         .mlb-card { background: linear-gradient(180deg, #161e2d 0%, #0a0f1a 100%); border: 1px solid rgba(255,255,255,0.05); }
-        /* Tom Select カスタム */
-        .ts-control { background: #0a0f1a !important; color: white !important; border: 1px solid #f9731644 !important; height: 50px; padding: 10px !important; font-weight: 800; }
+
+        /* --- Tom Select MLB Style --- */
+        .ts-control { background: #0a0f1a !important; color: white !important; border: 1px solid #f9731644 !important; height: 50px; padding: 10px !important; font-weight: 800; border-radius: 12px !important; }
         .ts-dropdown { background: #161e2d !important; color: white !important; border: 1px solid #f9731644 !important; }
         .ts-dropdown .active { background: #f97316 !important; }
-        /* Tom Select 入力中の文字色を白に固定し、背景とのコントラストを確保 */
-.ts-control input {
-    color: white !important;
-    font-family: 'Inter', sans-serif !important;
-    font-weight: 800 !important;
-}
+        .ts-control input { color: white !important; font-weight: 800 !important; }
+        .ts-dropdown .create { background: #f97316 !important; color: white !important; font-weight: 900 !important; text-transform: uppercase; font-style: italic; padding: 10px !important; }
+        .ts-control .item { display: inline-block !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 120px !important; }
 
-/* 「Add xxx...」という新規登録用項目の見た目をMLB風に強化 */
-.ts-dropdown .create {
-    background: #f97316 !important; /* オレンジ背景 */
-    color: white !important;
-    font-weight: 900 !important;
-    text-transform: uppercase;
-    font-style: italic;
-    padding: 10px !important;
-}
+        /* --- Tabulator MLB.com Stats Layout --- */
+        .tabulator { background: #ffffff !important; border: none !important; border-radius: 0 !important; }
+        
+        /* ヘッダー: MLB濃紺 + 最小フォント */
+        .tabulator-header { 
+            background-color: #041e42 !important; 
+            color: #ffffff !important; 
+            border-bottom: 2px solid #f97316 !important; 
+        }
+        .tabulator-col { 
+            background-color: #041e42 !important; 
+            color: white !important; 
+            font-size: 9px !important; 
+            text-transform: uppercase;
+            padding: 4px 0 !important;
+        }
+        .tabulator-col-title { text-align: center !important; width: 100%; }
 
-/* 入力中のプレースホルダー（うっすら見える文字）の色調整 */
-.ts-control input::placeholder {
-    color: rgba(255, 255, 255, 0.3) !important;
-}
-/* 選択済みアイテムが改行されないように固定 */
-.ts-control .item {
-    display: inline-block !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    max-width: 120px !important; /* 枠からはみ出さない最大幅 */
-    vertical-align: middle !important;
-}
+        /* セル: 白背景 + 11px (stats.html同期) */
+        .tabulator-row { background-color: #ffffff !important; border-bottom: 1px solid #e2e8f0 !important; min-height: 38px !important; }
+        .tabulator-row.tabulator-row-even { background-color: #f8fafc !important; } /* ストライプ */
+        
+        .tabulator-cell { 
+            padding: 8px 4px !important; 
+            font-size: 11px !important; 
+            font-weight: 800 !important; 
+            color: #1e293b !important;
+            border-right: 1px solid #e2e8f0 !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+        }
 
-/* 入力エリア自体の高さを固定し、中身が溢れても枠を広げない */
-.ts-control {
-    display: flex !important;
-    align-items: center !important;
-    height: 50px !important; /* 前回の設定と合わせる */
-    overflow: hidden !important;
-}
+        /* エディタ（入力中）の文字色を黒に強制 */
+        .tabulator-cell input {
+            color: #000000 !important;
+            background: #ffffff !important;
+            font-weight: 800 !important;
+            text-align: center !important;
+            font-size: 14px !important; /* 入力しやすさのため少し大きく */
+        }
 
-/* 入力中のテキストボックスも1行に固定 */
-.ts-control input {
-    display: inline-block !important;
-    width: auto !important;
-    max-width: 100% !important;
-}
+        /* 行番号・特殊ラベル列（左端） */
+        .tabulator-cell:first-child {
+            background-color: #041e42 !important;
+            color: white !important;
+            font-size: 9px !important;
+            border-right: none !important;
+        }
 
-        /* Tabulator カスタム */
-        .tabulator { background: transparent !important; border: none !important; }
-        .tabulator-header { background: #161e2d !important; color: #64748b !important; font-size: 10px !important; border-bottom: 2px solid #f97316 !important; }
-        .tabulator-row { background: transparent !important; border-bottom: 1px solid rgba(255,255,255,0.05) !important; }
-        .tabulator-cell { padding: 12px !important; font-weight: 800; font-family: 'Roboto Mono', monospace; }
-        .invalid-row { background-color: rgba(239, 68, 68, 0.1) !important; }
-        /* 1. プレイヤー選択時の改行（ガタつき）を防止 */
-.ts-control .item {
-    display: inline-block !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    max-width: 100px !important; /* 幅を制限してはみ出しを防ぐ */
-    vertical-align: middle !important;
-}
-
-/* 2. 入力中の文字色を白くして、背景と同化させない */
-.ts-control input {
-    color: white !important;
-    font-size: 16px !important; /* iOSのズーム防止 */
-}
-
-/* 3. 表（Tabulator）が横に広がらないように固定 */
-#score-table {
-    width: 100% !important;
-    max-width: 100vw;
-    overflow-x: hidden !important;
-}
-
-/* 4. スコア入力欄を数字キーボードに適したサイズに */
-.tabulator-cell {
-    font-size: 16px !important; 
-    font-weight: 800 !important;
-}
-
+        /* --- Utility --- */
+        #score-table { width: 100% !important; max-width: 100vw; overflow: hidden !important; }
+        .tabulator-edit-select-list { background: #161e2d !important; color: white !important; }
     </style>
 </head>
 <body class="pb-32">
@@ -121,14 +98,14 @@
 
         <div class="mlb-card rounded-2xl overflow-hidden shadow-2xl">
             <div id="score-table"></div>
-            <div class="p-3 bg-white/5 flex justify-between items-center">
-                <button id="add-row" class="text-[10px] font-black text-orange-500 border border-orange-500/30 px-4 py-2 rounded-full active:scale-95 transition-all">+ NEW MATCH</button>
-                <div id="status-badge" class="text-[9px] font-mono text-slate-500 uppercase">Checking Integrity...</div>
+            <div class="p-3 bg-white/5 flex justify-between items-center border-t border-white/10">
+                <button id="add-row" class="text-[10px] font-black text-orange-500 border border-orange-500/30 px-4 py-2 rounded-full active:scale-95 transition-all uppercase tracking-tighter">+ Add New Match</button>
+                <div id="status-badge" class="text-[9px] font-mono text-slate-500 uppercase tracking-widest">Checking Integrity...</div>
             </div>
         </div>
 
-        <button id="submit-btn" class="w-full py-5 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-2xl shadow-xl shadow-orange-900/20 transition-all active:scale-95 disabled:opacity-20 disabled:grayscale">
-            FINALIZE & UPLOAD
+        <button id="submit-btn" class="w-full py-5 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-2xl shadow-xl shadow-orange-900/20 transition-all active:scale-95 disabled:opacity-20 disabled:grayscale uppercase tracking-widest text-sm">
+            Finalize & Upload
         </button>
     </div>
 

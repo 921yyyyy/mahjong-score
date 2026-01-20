@@ -1,9 +1,16 @@
+// app.js の 1行目付近
 document.addEventListener('DOMContentLoaded', async () => {
-    const SUPABASE_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
+    const SUPABASE_URL = '...';
+    const SUPABASE_KEY = '...';
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // ★ここから挿入
+    const dateInput = document.getElementById('game-date');
+    dateInput.value = new Date().toISOString().split('T')[0];
+    // ★ここまで挿入
+
     let playerSelects = {};
+
     let rowCount = 0;
 
     async function initRoster() {

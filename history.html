@@ -151,73 +151,95 @@
 
 
                 window.showSessionDetail = async function(gId, date) {
-            const modal = document.getElementById('detail-modal');
-            const content = document.getElementById('modal-content');
-            const dateLabel = document.getElementById('modal-date');
-            
-            dateLabel.innerText = date;
-            content.innerHTML = "<div class='p-10 text-center animate-pulse'>LOADING MATCH DATA...</div>";
-            modal.classList.add('active');
+    const modal = document.getElementById('detail-modal');
+    const content = document.getElementById('modal-content');
+    const dateLabel = document.getElementById('modal-date');
+    
+    dateLabel.innerText = date;
+    content.innerHTML = "<div class='p-10 text-center animate-pulse text-[10px] tracking-widest'>FETCHING BOX SCORE...</div>";
+    modal.classList.add('active');
 
-            try {
-                // game_id を使って直接取得（日付フィルタより確実です）
-                const { data: matches, error } = await sb.from('game_results')
-                    .select('*')
-                    .eq('game_id', gId)
-                    .order('created_at', { ascending: true });
+    try {
+        // 1. そのセッションの最終集計（チップ・コイン）を取得
+        const { data: summary, error: sError } = await sb.from('set_summaries')
+            .select('*').eq('game_id', gId);
+        
+        // 2. そのセッションの各半荘スコアを取得
+        const { data: matches, error: mError } = await sb.from('game_results')
+            .select('*').eq('game_id', gId).order('created_at', { ascending: true });
 
-                if (error) throw error;
+        if (sError || mError) throw (sError || mError);
 
-                // 半荘ごとにグループ化（created_atの秒まで同じ4人を1セットとする）
-                const grouped = {};
-                matches.forEach(m => {
-                    const timeKey = new Date(m.created_at).getTime(); 
-                    if(!grouped[timeKey]) grouped[timeKey] = [];
-                    grouped[timeKey].push(m);
-                });
+        content.innerHTML = "";
 
-                content.innerHTML = "";
-                const matchTimes = Object.keys(grouped).sort();
-                
-                if (matchTimes.length === 0) {
-                    content.innerHTML = "<div class='text-center text-slate-500 py-20'>No match data found.</div>";
-                    return;
-                }
+        // --- SECTION 1: SESSION PAYOUT (精算サマリー) ---
+        const summarySorted = summary.sort((a, b) => b.total_score - a.total_score);
+        let summaryHtml = `
+            <section class="mb-10">
+                <h3 class="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-4 border-l-2 border-orange-500 pl-2">Session Payout</h3>
+                <div class="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+                    <table class="w-full text-left border-collapse text-[11px]">
+                        <thead>
+                            <tr class="bg-white/10 text-[9px] text-slate-400 uppercase">
+                                <th class="p-3">Player</th>
+                                <th class="p-3 text-right">Pts</th>
+                                <th class="p-3 text-right">Tip</th>
+                                <th class="p-3 text-right text-orange-400">Coin</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${summarySorted.map(s => `
+                                <tr class="border-b border-white/5">
+                                    <td class="p-3 font-bold text-white">${s.player_name}</td>
+                                    <td class="p-3 text-right font-mono ${s.total_score >= 0 ? 'text-blue-400' : 'text-red-400'}">${s.total_score > 0 ? '+' : ''}${s.total_score}</td>
+                                    <td class="p-3 text-right font-mono text-slate-300">${s.tips > 0 ? '+' : ''}${s.tips}</td>
+                                    <td class="p-3 text-right font-mono font-black text-orange-500">${s.coins.toLocaleString()}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </section>`;
+        content.innerHTML += summaryHtml;
 
-                matchTimes.forEach((time, i) => {
-                    const players = grouped[time].sort((a,b) => a.rank - b.rank);
-                    const matchCard = `
-                        <div class="bg-white/5 rounded-lg overflow-hidden border border-white/10 mb-6">
-                            <div class="bg-white/10 px-4 py-2 flex justify-between items-center">
-                                <span class="text-[10px] font-black uppercase tracking-widest text-orange-400">Match #${i+1}</span>
-                                <span class="text-[9px] text-slate-500 font-mono">${new Date(players[0].created_at).toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'})}</span>
-                            </div>
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="text-[8px] text-slate-500 uppercase border-b border-white/5">
-                                        <th class="p-3 w-16">Rank</th>
-                                        <th class="p-3">Player</th>
-                                        <th class="p-3 text-right">Score</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${players.map(p => `
-                                        <tr class="border-b border-white/5 last:border-0">
-                                            <td class="p-3 text-lg font-black italic ${p.rank==1?'rank-gold': (p.rank==4?'text-red-500':'text-slate-400')}">${p.rank}</td>
-                                            <td class="p-3 text-xs font-bold text-slate-200">${p.player_name}</td>
-                                            <td class="p-3 text-right font-mono font-bold ${p.score>=0?'text-blue-400':'text-red-400'}">${p.score>0?'+':''}${p.score}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>`;
-                    content.innerHTML += matchCard;
-                });
-            } catch (e) { 
-                console.error(e);
-                content.innerHTML = "<div class='p-10 text-red-500 text-center'>ERROR LOADING DATA</div>"; 
-            }
+        // --- SECTION 2: MATCH LOGS (各半荘明細) ---
+        const grouped = [];
+        for (let i = 0; i < matches.length; i += 4) {
+            grouped.push(matches.slice(i, i + 4));
         }
+
+        let logsHtml = `<h3 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 border-l-2 border-slate-500 pl-2">Match Logs</h3>`;
+        
+        grouped.forEach((players, i) => {
+            players.sort((a, b) => a.rank - b.rank);
+            logsHtml += `
+                <div class="bg-white/5 rounded-lg overflow-hidden border border-white/10 mb-6">
+                    <div class="bg-white/10 px-4 py-2 flex justify-between items-center">
+                        <span class="text-[9px] font-black uppercase tracking-widest text-slate-400 italic">Match #${i+1}</span>
+                    </div>
+                    <table class="w-full text-left border-collapse text-[11px]">
+                        <tbody>
+                            ${players.map(p => `
+                                <tr class="border-b border-white/5 last:border-0">
+                                    <td class="p-3 w-8 text-lg font-black italic ${p.rank==1?'text-yellow-400': 'text-slate-600'}">${p.rank}</td>
+                                    <td class="p-3 font-bold text-slate-200">${p.player_name}</td>
+                                    <td class="p-3 text-right font-mono font-bold ${p.score>=0?'text-blue-400':'text-red-400'}">
+                                        ${p.score > 0 ? '+' : ''}${p.score}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+        });
+        content.innerHTML += logsHtml;
+
+    } catch (e) { 
+        console.error(e);
+        content.innerHTML = "<div class='p-10 text-red-500 text-center text-xs'>ERROR DATA SYNC</div>"; 
+    }
+}
+
 
 
         window.closeModal = function() {

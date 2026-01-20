@@ -191,37 +191,44 @@
             await renderStats(mode);
         };
 
-        window.showPlayerDetail = async function(playerName) {
-            const modal = document.getElementById('player-modal');
-            document.getElementById('modal-player-name').innerText = playerName;
-            modal.classList.remove('hidden');
+       window.showPlayerDetail = async function(playerName) {
+    const modal = document.getElementById('player-modal');
+    document.getElementById('modal-player-name').innerText = playerName;
+    modal.classList.remove('hidden');
 
-            try {
-                const { data: mData } = await sb.from('game_results')
-                    .select('rank, score')
-                    .eq('player_name', playerName)
-                    .order('created_at', { ascending: false }).limit(20);
+    try {
+        // 1. Matchデータ取得 (最新20件を取得)
+        const { data: mData } = await sb.from('game_results')
+            .select('rank, score')
+            .eq('player_name', playerName)
+            .order('created_at', { ascending: false }).limit(20);
 
-                const { data: sData } = await sb.from('set_summaries')
-                    .select('total_score, final_rank')
-                    .eq('player_name', playerName)
-                    .order('created_at', { ascending: false }).limit(10);
+        // 2. Sessionデータ取得 (最新10件を取得)
+        const { data: sData } = await sb.from('set_summaries')
+            .select('total_score, final_rank')
+            .eq('player_name', playerName)
+            .order('created_at', { ascending: false }).limit(10);
 
-                if (mData) {
-                    const revM = [...mData].reverse();
-                    renderAdvancedChart('matchChart', revM.map(d=>d.rank), revM.map(d=>d.score), '#3b82f6', 'match');
-                    const avg = (revM.reduce((a, b) => a + b.rank, 0) / revM.length).toFixed(2);
-                    document.getElementById('stat-match-avg').innerText = avg;
-                }
+        // --- Matchグラフ描画 (最新順を反転させて過去→最新にする) ---
+        if (mData && mData.length > 0) {
+            const revM = mData.slice().reverse(); 
+            renderAdvancedChart('matchChart', revM.map(d=>d.rank), revM.map(d=>d.score), '#3b82f6', 'match');
+            const avg = (revM.reduce((a, b) => a + b.rank, 0) / revM.length).toFixed(2);
+            document.getElementById('stat-match-avg').innerText = avg;
+        }
 
-                if (sData) {
-                    const revS = [...sData].reverse();
-                    renderAdvancedChart('sessChart', revS.map(d=>d.final_rank), revS.map(d=>d.total_score), '#f97316', 'sess');
-                    const sAvg = (revS.reduce((a, b) => a + (b.final_rank||0), 0) / revS.length).toFixed(2);
-                    document.getElementById('stat-sess-avg').innerText = sAvg;
-                }
-            } catch (e) { console.error(e); }
-        };
+        // --- Sessionグラフ描画 (最新順を反転させて過去→最新にする) ---
+        if (sData && sData.length > 0) {
+            const revS = sData.slice().reverse(); 
+            renderAdvancedChart('sessChart', revS.map(d=>d.final_rank), revS.map(d=>d.total_score), '#f97316', 'sess');
+            const sAvg = (revS.reduce((a, b) => a + (b.final_rank||0), 0) / revS.length).toFixed(2);
+            document.getElementById('stat-sess-avg').innerText = sAvg;
+        }
+    } catch (e) { 
+        console.error("Detail Error:", e); 
+    }
+};
+
 
         function renderAdvancedChart(canvasId, ranks, scores, themeColor, type) {
             const ctx = document.getElementById(canvasId).getContext('2d');

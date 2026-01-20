@@ -99,39 +99,54 @@
 
     <script src="navbar.js" defer></script>
 
-    <script>
-    // 1. Supabaseクライアントを関数の外（グローバル）で定義
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/gridjs/dist/gridjs.umd.js"></script>
+
+<script>
+    // グローバル変数の定義
     const S_URL = 'https://zekfibkimvsfbnctwzti.supabase.co';
     const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
-    const sb = window.supabase.createClient(S_URL, S_KEY);
-
+    let sb;
     let gridInstance = null;
     let matchChartObj = null;
     let sessChartObj = null;
 
-    window.addEventListener('load', () => {
-        async function renderStats(mode) {
-            const container = document.getElementById('mlb-grid-container');
-            
-            if (gridInstance) {
-                gridInstance.destroy(); 
-            }
-            container.innerHTML = `<div class='p-10 text-slate-400 text-center font-bold animate-pulse'>LOADING ${mode.toUpperCase()}...</div>`;
-            
+    // 以前のトラブル解決策：DOMContentLoadedで確実に初期化
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Supabaseの初期化をここで行う
+        if (window.supabase) {
+            sb = window.supabase.createClient(S_URL, S_KEY);
+        } else {
+            console.error("Supabase library not loaded");
+            return;
+        }
+
+        // 初回レンダリング
+        await renderStats('match');
+    });
+
+    async function renderStats(mode) {
+        const container = document.getElementById('mlb-grid-container');
+        if (!container) return;
+
+        // 既存Gridの破棄
+        if (gridInstance) {
+            gridInstance.destroy();
+        }
+        container.innerHTML = `<div class='p-10 text-slate-400 text-center font-bold animate-pulse'>LOADING ${mode.toUpperCase()}...</div>`;
+
+        try {
             const tableName = mode === 'match' ? 'game_results' : 'set_summaries';
             const { data, error } = await sb.from(tableName).select('*');
-            
-            if (error || !data) {
-                container.innerHTML = "<div class='p-10 text-red-500'>FETCH ERROR</div>";
-                return;
-            }
 
+            if (error || !data) throw error;
+
+            // --- データ集計ロジック（ここは変更なし） ---
             const stats = {};
             data.forEach(r => {
                 const n = r.player_name || 'Unknown';
                 const rk = mode === 'match' ? Number(r.rank || 0) : Number(r.final_rank || 0);
                 const sc = mode === 'match' ? Number(r.score || 0) : Number(r.total_score || 0);
-                
                 if(!stats[n]) stats[n] = { n, g:0, sumR:0, pts:0, f:0, s:0, l:0, mx:-999 };
                 stats[n].g++;
                 stats[n].sumR += rk;
@@ -156,18 +171,15 @@
                 : ["PLAYER", "S-G", "S-AVG", "S-1ST", "S-TOP%", "S-REN%", "S-ESC%", "S-MAX", "S-PTS"];
 
             container.innerHTML = '';
-            
+
+            // Grid.jsの初期化
             gridInstance = new gridjs.Grid({
                 columns: headers.map((h, index) => ({ 
                     name: h, 
                     sort: { enabled: true },
                     formatter: (cell) => {
                         if (index === 0) {
-                            return gridjs.html(`
-                                <div onclick="showPlayerDetail('${cell}')" class="text-blue-600 underline cursor-pointer font-black italic">
-                                    ${cell}
-                                </div>
-                            `);
+                            return gridjs.html(`<div onclick="showPlayerDetail('${cell}')" class="text-blue-600 underline cursor-pointer font-black italic">${cell}</div>`);
                         }
                         return cell;
                     }
@@ -177,17 +189,25 @@
                 fixedHeader: true,
                 style: { table: { 'min-width': '650px' } },
                 language: { 'search': { 'placeholder': '選手名検索...' } }
-            }).render(container);
+            });
+
+            gridInstance.render(container);
+
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = `<div class='p-10 text-red-500 font-bold'>ERROR: ${e.message}</div>`;
         }
+    }
 
-        window.changeTab = function(mode) {
-            document.getElementById('btn-match').classList.toggle('active', mode === 'match');
-            document.getElementById('btn-session').classList.toggle('active', mode === 'session');
-            renderStats(mode);
-        };
+    // タブ切り替え関数をグローバルに
+    window.changeTab = async function(mode) {
+        document.getElementById('btn-match').classList.toggle('active', mode === 'match');
+        document.getElementById('btn-session').classList.toggle('active', mode === 'session');
+        await renderStats(mode);
+    };
 
-        renderStats('match');
-    });
+    // --- 詳細モーダル関連の関数（showPlayerDetail, renderChart 等は前回のコードをそのまま維持） ---
+    // ※ ここに以前お送りした showPlayerDetail と renderChart, closePlayerModal を追加してください
 
     // --- プレイヤー詳細モーダル用ロジック ---
     window.showPlayerDetail = async function(playerName) {

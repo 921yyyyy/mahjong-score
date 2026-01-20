@@ -35,7 +35,14 @@
             <h1 class="text-3xl font-black italic uppercase tracking-tighter border-l-4 border-orange-500 pl-3 leading-none text-white">Data <span class="text-orange-500">Entry</span></h1>
         </header>
 
+        <div class="px-1">
+            <label class="text-[10px] text-slate-500 font-black tracking-widest uppercase block mb-2 ml-1">Game Date</label>
+            <input type="date" id="game-date" 
+                class="bg-[#161e2d] text-white border border-white/10 rounded-lg p-3 w-full font-mono font-bold focus:border-orange-500 outline-none transition-all shadow-inner">
+        </div>
+
         <div class="grid grid-cols-2 gap-3 mb-6">
+
             <select id="pA" class="roster-select"></select><select id="pB" class="roster-select"></select>
             <select id="pC" class="roster-select"></select><select id="pD" class="roster-select"></select>
         </div>

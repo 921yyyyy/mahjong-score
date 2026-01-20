@@ -5,10 +5,13 @@ const sb = window.supabase.createClient(S_URL, S_KEY);
 async function initHistory() {
     try {
         // 1. Session（日別集計）を取得
-        const { data: sessionData, error: sError } = await sb
-            .from('set_summaries')
-            .select('*')
-            .order('created_at', { ascending: false });
+        // history.js の initHistory 内
+const { data: results, error } = await sb.from('game_results')
+    .select('*')
+    // .order('created_at', { ascending: true }) // ←これを消して、下に入れ替え
+    .order('game_date', { ascending: false }) // 1. まず日付の新しい順にする
+    .order('created_at', { ascending: false }); // 2. 同じ日付内なら時間の新しい順にする
+
 
         if (sError) throw sError;
 

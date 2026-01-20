@@ -158,14 +158,28 @@
 
             container.innerHTML = '';
             
+            // <script>内の renderStats 関数の中、Gridの定義部分を探して以下のように書き換えてください
+
             // 3. 新しいインスタンスを生成して保持
             gridInstance = new gridjs.Grid({
-                columns: headers.map(h => ({ 
+                columns: headers.map((h, index) => ({ 
                     name: h, 
                     sort: { enabled: true },
-                    // 数値列は数値としてソートするように指定（オプション）
+                    // ★ここを追加：1列目（PLAYER名）にクリックイベントを付与
+                    formatter: (cell) => {
+                        if (index === 0) { // 最初の列(PLAYER)の場合
+                            return gridjs.html(`
+                                <div onclick="showPlayerDetail('${cell}')" class="text-blue-600 underline cursor-pointer">
+                                    ${cell}
+                                </div>
+                            `);
+                        }
+                        return cell;
+                    }
                 })),
                 data: tableData,
+// ...以下続く
+
                 search: true,
                 fixedHeader: true,
                 style: { table: { 'min-width': '650px' } },
@@ -183,6 +197,95 @@
 
         renderStats('match');
     });
+            // --- グラフ表示用の関数セット ---
+        let matchChartObj = null;
+        let sessChartObj = null;
+
+        window.showPlayerDetail = async function(playerName) {
+            const modal = document.getElementById('player-modal');
+            document.getElementById('modal-player-name').innerText = playerName;
+            modal.classList.remove('hidden');
+
+            try {
+                // 1. 直近10 Matchの順位を取得
+                const { data: mData } = await sb.from('game_results')
+                    .select('rank')
+                    .eq('player_name', playerName)
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+
+                // 2. 直近10 Sessionのスコアを取得
+                const { data: sData } = await sb.from('set_summaries')
+                    .select('total_score, tips')
+                    .eq('player_name', playerName)
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+
+                const matchRanks = mData ? mData.map(d => d.rank).reverse() : [];
+                const sessScores = sData ? sData.map(d => d.total_score).reverse() : [];
+
+                // 簡易スタッツの更新
+                if (matchRanks.length > 0) {
+                    const matchAvg = (matchRanks.reduce((a, b) => a + b, 0) / matchRanks.length).toFixed(2);
+                    document.getElementById('stat-match-avg').innerText = matchAvg;
+                }
+                document.getElementById('stat-sess-avg').innerText = sData && sData[0] ? sData[0].total_score : 0;
+                
+                // 3. グラフ描画
+                renderChart('matchChart', matchRanks, '#3b82f6', 'Match Rank', true);
+                renderChart('sessChart', sessScores, '#f97316', 'Session Pts', false);
+
+            } catch (e) { console.error('Error fetching details:', e); }
+        };
+
+        function renderChart(canvasId, data, color, label, isRank) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            
+            // 既存のグラフを破棄
+            if (canvasId === 'matchChart' && matchChartObj) matchChartObj.destroy();
+            if (canvasId === 'sessChart' && sessChartObj) sessChartObj.destroy();
+
+            const newChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map((_, i) => i + 1),
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: color,
+                        backgroundColor: color + '33',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: color,
+                        borderWidth: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            reverse: isRank, // 順位なら1位を上にする
+                            min: isRank ? 1 : undefined,
+                            max: isRank ? 4 : undefined,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#94a3b8', font: { weight: 'bold' }, stepSize: 1 }
+                        },
+                        x: { display: false }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            if (canvasId === 'matchChart') matchChartObj = newChart;
+            if (canvasId === 'sessChart') sessChartObj = newChart;
+        }
+
+        window.closePlayerModal = () => {
+            document.getElementById('player-modal').classList.add('hidden');
+        };
+
 </script>
 
 </body>

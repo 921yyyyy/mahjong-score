@@ -201,6 +201,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             });
 
+            // --- 既存のコード (ここから) ---
             const summaries = names.map((name, i) => ({
                 game_id: game.id,
                 player_id: mstr.find(m => m.name === name).id,
@@ -209,9 +210,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 tips: Number(document.querySelector(`.tip-in[data-col="${['a','b','c','d'][i]}"]`).value) || 0,
                 coins: Number(document.getElementById(`coin-${['a','b','c','d'][i]}`).innerText),
                 final_rank: 0,
-                created_at: finalTimestamp // ★追加
+                created_at: finalTimestamp
             }));
-// 以下、既存の insert 処理へ続く...
+
+            // ★ここから挿入：Sessionの順位(final_rank)を計算する
+            const sortedSummaries = [...summaries].sort((a, b) => b.total_score - a.total_score);
+            summaries.forEach(s => {
+                s.final_rank = sortedSummaries.findIndex(sorted => sorted.player_name === s.player_name) + 1;
+            });
+            // ★ここまで挿入
+
+            await sb.from('game_results').insert(results);
+// --- 既存のコード (ここまで) ---
 
 
             await sb.from('game_results').insert(results);

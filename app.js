@@ -40,12 +40,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 row.update({ a: scoreTotals.a - maxScore, b: scoreTotals.b - maxScore, c: scoreTotals.c - maxScore, d: scoreTotals.d - maxScore });
             } else if(rowData.type === "coin") {
                 row.update({ a: (scoreTotals.a * 20) + (tips.a * 50), b: (scoreTotals.b * 20) + (tips.b * 50), c: (scoreTotals.c * 20) + (tips.c * 50), d: (scoreTotals.d * 20) + (tips.d * 50) });
+            } else if(rowData.type === "total") {
+                row.update({ a: scoreTotals.a, b: scoreTotals.b, c: scoreTotals.c, d: scoreTotals.d });
             }
         });
     }
 
     const createScoreColumn = (title, field) => ({
-        title: title, field: field, editor: "number", hozAlign: "center", headerSort: false, resizable: false,
+        title: title, field: field, editor: "number", hozAlign: "center", headerSort: false, 
+        width: 85, // MLB Statsに合わせた固定幅
         editorParams: { elementAttributes: { inputmode: "decimal" } },
         editable: (cell) => ["score", "tip"].includes(cell.getRow().getData().type),
         formatter: function(cell) {
@@ -53,22 +56,29 @@ document.addEventListener('DOMContentLoaded', async () => {
             const rowData = cell.getRow().getData();
             const el = cell.getElement();
 
-            // MLB.com Style: プレーンな背景に太字の数値
-            el.style.borderBottom = "1px solid #e2e8f0";
-            
-            if (rowData.type === "score") {
+            // Stats画面と共通の文字サイズ設定
+            el.style.fontSize = "11px";
+            el.style.padding = "8px 5px";
+
+            if (["score", "tip"].includes(rowData.type)) {
                 el.style.backgroundColor = "#ffffff";
-                if (val > 0) return `<span style="color:#005ac9; font-weight:700;">${val}</span>`;
-                if (val < 0) return `<span style="color:#a5091d; font-weight:700;">${val}</span>`;
-                return val === 0 ? `<span style="color:#94a3b8;">0</span>` : "";
+                el.style.color = "#1e293b"; // 通常は黒
+                if (val > 0) return `<span class="pts-positive" style="color:#1d4ed8; font-weight:800;">+${val}</span>`;
+                if (val < 0) return `<span class="pts-negative" style="color:#be123c; font-weight:800;">${val}</span>`;
             } else {
-                // DIFF, TIP, COIN: MLB.comのフッター風（薄グレー）
-                el.style.backgroundColor = "#f7f9fc";
+                // 特殊行（DIFF, COIN, TOTAL）はstats.html風の背景
+                el.style.backgroundColor = rowData.type === "coin" ? "#f1f5f9" : "#f8fafc";
                 el.style.color = "#041e42";
-                el.style.fontWeight = rowData.type === "coin" ? "900" : "600";
-                if (rowData.type === "coin") el.style.color = "#005ac9";
+                el.style.fontWeight = "900";
+                if (rowData.type === "coin") el.style.color = "#f97316";
                 return val;
             }
+            return val === 0 ? "0" : (val || "");
+        },
+        cellEditing: (cell) => {
+            // 入力中の文字色を黒に固定
+            const input = cell.getElement().querySelector("input");
+            if (input) input.style.color = "#000";
         },
         cellDblClick: (e, cell) => {
             let val = cell.getValue();
@@ -85,39 +95,37 @@ document.addEventListener('DOMContentLoaded', async () => {
             {type: "score", a: null, b: null, c: null, d: null},
             {type: "score", a: null, b: null, c: null, d: null},
             {type: "score", a: null, b: null, c: null, d: null},
+            {type: "total", label: "TOTAL", a: 0, b: 0, c: 0, d: 0},
             {type: "diff", label: "DIFF", a: 0, b: 0, c: 0, d: 0},
-            {type: "tip", label: "TIP", a: 0, b: 0, c: 0, d: 0},
+            {type: "tip", label: "TIP", a: null, b: null, c: null, d: null},
             {type: "coin", label: "COIN", a: 0, b: 0, c: 0, d: 0}
         ],
-        layout: "fitColumns",
+        layout: "fitDataFill",
         headerVisible: true,
         columns: [
             {
-                title: "RK", field: "label", width: 50, hozAlign: "center", headerSort: false,
+                title: "NO", field: "label", width: 65, hozAlign: "center", headerSort: false,
                 formatter: (cell) => {
                     const data = cell.getRow().getData();
                     const el = cell.getElement();
-                    el.style.backgroundColor = "#f1f5f9";
-                    el.style.color = "#64748b";
-                    el.style.fontSize = "10px";
+                    el.style.backgroundColor = "#041e42";
+                    el.style.color = "#ffffff";
+                    el.style.fontSize = "9px";
                     el.style.fontWeight = "bold";
+                    el.style.borderBottom = "1px solid rgba(255,255,255,0.1)";
                     return data.type === "score" ? cell.getRow().getPosition() : data.label;
                 }
             },
             createScoreColumn("A", "a"), createScoreColumn("B", "b"), createScoreColumn("C", "c"), createScoreColumn("D", "d"),
             {
-                title: "BAL", width: 50, hozAlign: "center", headerSort: false,
+                title: "BAL", width: 65, hozAlign: "center", headerSort: false,
                 formatter: (cell) => {
                     const d = cell.getData();
                     if(d.type !== "score") return "";
                     const sum = (Number(d.a)||0) + (Number(d.b)||0) + (Number(d.c)||0) + (Number(d.d)||0);
-                    // ✅の代わりに数値と背景色で整合性を表現
-                    if (sum === 0) {
-                        return `<span style="font-weight:900; color:#041e42;">0</span>`;
-                    } else {
-                        cell.getElement().style.backgroundColor = "#fff1f2"; // 不整合時は薄い赤背景
-                        return `<span style="color:#e11d48; font-weight:bold; font-size:10px;">${sum > 0 ? '+' : ''}${sum}</span>`;
-                    }
+                    if (sum === 0) return `<span style="color:#64748b; font-size:9px;">OK</span>`;
+                    // 計算ボタン：MLB.comのボタン風
+                    return `<button style="background:#f97316; color:white; font-size:8px; padding:2px 6px; border-radius:4px; font-weight:900;">CALC</button>`;
                 },
                 cellClick: (e, cell) => {
                     const row = cell.getRow();
@@ -132,8 +140,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     document.getElementById("add-row").onclick = () => {
-        const tipRow = table.getRows().find(r => r.getData().type === "tip");
-        table.addRow({type: "score", a:null, b:null, c:null, d:null}, false, tipRow);
+        const totalRow = table.getRows().find(r => r.getData().type === "total");
+        table.addRow({type: "score", a:null, b:null, c:null, d:null}, false, totalRow);
     };
 
     function validateAll() {
@@ -154,7 +162,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('submit-btn').onclick = async () => {
         const btn = document.getElementById('submit-btn');
-        btn.disabled = true; btn.innerText = "UPLOADING TO STATS...";
+        btn.disabled = true; btn.innerText = "UPLOADING...";
         try {
             const names = Object.values(playerSelects).map(s => s.getValue());
             for(const name of names) await sb.from('players').upsert({ name: name }, { onConflict: 'name' });

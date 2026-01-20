@@ -38,13 +38,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         resizable: false, 
         editorParams: {
             elementAttributes: {
-                inputmode: "decimal", // スマホで数字キーボードを出す
+                // ここを修正：textモードにすることでマイナス記号の入力を許可しやすくします
+                inputmode: "text", 
+                type: "text" // number型だとマイナスが弾かれる場合があるためtextで受ける
             }
         },
         cellDblClick: function(e, cell) {
             let val = cell.getValue();
             if (val) {
-                cell.setValue(val * -1); // プラスマイナス反転
+                cell.setValue(val * -1); 
                 validateAll();
             }
         }
@@ -71,7 +73,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 cellClick: function(e, cell) {
                     const rowData = cell.getData();
                     const currentSum = (Number(rowData.a)||0) + (Number(rowData.b)||0) + (Number(rowData.c)||0);
-                    cell.getRow().update({ d: -currentSum }); // 自動整列ロジック
+                    cell.getRow().update({ d: -currentSum }); 
                     validateAll();
                 }
             }
@@ -99,7 +101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('status-badge').innerText = btn.disabled ? "Check Inputs..." : "Ready to Sync";
     }
 
-    // 4. 保存処理 (DB構成に準拠)
+    // 4. 保存処理
     document.getElementById('submit-btn').onclick = async () => {
         const btn = document.getElementById('submit-btn');
         btn.disabled = true; btn.innerText = "SYNCING TO CLOUD...";

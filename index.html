@@ -3,110 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>STATS ENTRY | PRO</title>
+    <title>STATS ENTRY | MLB OFFICIAL</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator_midnight.min.css" rel="stylesheet">
-    <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
-    
     <style>
-        body { background-color: #070d1c; color: white; font-family: 'Inter', sans-serif; }
-        .mlb-card { background: linear-gradient(180deg, #161e2d 0%, #0a0f1a 100%); border: 1px solid rgba(255,255,255,0.05); }
-
-        /* --- Tom Select MLB Style --- */
-        .ts-control { background: #0a0f1a !important; color: white !important; border: 1px solid #f9731644 !important; height: 50px; padding: 10px !important; font-weight: 800; border-radius: 12px !important; }
-        .ts-dropdown { background: #161e2d !important; color: white !important; border: 1px solid #f9731644 !important; }
-        .ts-dropdown .active { background: #f97316 !important; }
-        .ts-control input { color: white !important; font-weight: 800 !important; }
-        .ts-dropdown .create { background: #f97316 !important; color: white !important; font-weight: 900 !important; text-transform: uppercase; font-style: italic; padding: 10px !important; }
-        .ts-control .item { display: inline-block !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 120px !important; }
-
-        /* --- Tabulator MLB.com Stats Layout --- */
-        .tabulator { background: #ffffff !important; border: none !important; border-radius: 0 !important; }
+        body { background-color: #070d1c; color: #f1f5f9; font-family: 'Inter', sans-serif; }
+        /* stats.htmlのデザインを完全継承 */
+        .mlb-table-container { background-color: #ffffff; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 400px; table-layout: fixed; }
         
-        /* ヘッダー: MLB濃紺 + 最小フォント */
-        .tabulator-header { 
-            background-color: #041e42 !important; 
-            color: #ffffff !important; 
-            border-bottom: 2px solid #f97316 !important; 
+        /* ヘッダー: MLB.com Stats 準拠 */
+        th { 
+            background-color: #041e42 !important; color: #ffffff !important;
+            text-transform: uppercase; font-size: 9px !important;
+            padding: 12px 5px !important; text-align: center !important;
+            border-right: 1px solid rgba(255,255,255,0.1);
         }
-        .tabulator-col { 
-            background-color: #041e42 !important; 
-            color: white !important; 
-            font-size: 9px !important; 
-            text-transform: uppercase;
-            padding: 4px 0 !important;
-        }
-        .tabulator-col-title { text-align: center !important; width: 100%; }
-
-        /* セル: 白背景 + 11px (stats.html同期) */
-        .tabulator-row { background-color: #ffffff !important; border-bottom: 1px solid #e2e8f0 !important; min-height: 38px !important; }
-        .tabulator-row.tabulator-row-even { background-color: #f8fafc !important; } /* ストライプ */
         
-        .tabulator-cell { 
-            padding: 8px 4px !important; 
-            font-size: 11px !important; 
-            font-weight: 800 !important; 
-            color: #1e293b !important;
-            border-right: 1px solid #e2e8f0 !important;
-            display: flex !important;
-            align-items: center;
-            justify-content: center;
+        /* セル: stats.html(11px)準拠 */
+        td { 
+            background-color: #ffffff; color: #1e293b;
+            font-weight: 800; font-size: 11px;
+            border-bottom: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;
+            padding: 0 !important; height: 44px; text-align: center;
         }
-
-        /* エディタ（入力中）の文字色を黒に強制 */
-        .tabulator-cell input {
-            color: #000000 !important;
-            background: #ffffff !important;
-            font-weight: 800 !important;
-            text-align: center !important;
-            font-size: 14px !important; /* 入力しやすさのため少し大きく */
+        tr:nth-child(odd) td { background-color: #f8fafc; }
+        
+        /* 入力エリア */
+        .cell-input {
+            width: 100%; height: 100%; border: none; background: transparent;
+            text-align: center; font-weight: 800; font-size: 14px; color: #1e293b;
+            outline: none; transition: all 0.2s;
         }
-
-        /* 行番号・特殊ラベル列（左端） */
-        .tabulator-cell:first-child {
-            background-color: #041e42 !important;
-            color: white !important;
-            font-size: 9px !important;
-            border-right: none !important;
-        }
-
-        /* --- Utility --- */
-        #score-table { width: 100% !important; max-width: 100vw; overflow: hidden !important; }
-        .tabulator-edit-select-list { background: #161e2d !important; color: white !important; }
+        .cell-input:focus { background-color: #fff7ed; box-shadow: inset 0 0 0 2px #f97316; }
+        
+        /* ラベル列 (NO) */
+        .col-no { background-color: #041e42 !important; color: white !important; font-size: 9px !important; width: 45px; }
+        .row-special td { background-color: #f1f5f9 !important; font-weight: 900; }
+        
+        /* カラー設定 */
+        .pts-positive { color: #1d4ed8 !important; }
+        .pts-negative { color: #be123c !important; }
+        
+        /* CALCボタン */
+        .btn-calc { background: #041e42; color: white; font-size: 8px; padding: 4px 8px; border-radius: 2px; font-weight: 900; }
+        
+        /* TomSelect調整 */
+        .ts-control { background: #161e2d !important; color: white !important; border: 1px solid #334155 !important; border-radius: 4px !important; font-weight: 700; }
+        .ts-control input { color: white !important; }
     </style>
 </head>
-<body class="pb-32">
-    <div class="max-w-xl mx-auto p-4 space-y-6">
-        <header class="pt-6">
-            <span class="text-[10px] text-orange-500 font-black tracking-[0.3em] uppercase block mb-1">Data Collection</span>
-            <h1 class="text-3xl font-black italic uppercase tracking-tighter border-b-2 border-orange-500 inline-block leading-none pb-1">Entry</h1>
+<body class="pb-32 px-4">
+    <div class="max-w-md mx-auto space-y-6">
+        <header class="py-6">
+            <h1 class="text-2xl font-black italic uppercase tracking-tighter text-white leading-none">Analysis Center <span class="text-orange-500">Entry</span></h1>
         </header>
 
-        <section class="mlb-card p-5 rounded-2xl shadow-2xl space-y-4">
-            <h2 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                <span class="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></span>Active Roster
-            </h2>
-            <div class="grid grid-cols-2 gap-3">
-                <select id="pA" class="roster-select" placeholder="SELECT A"></select>
-                <select id="pB" class="roster-select" placeholder="SELECT B"></select>
-                <select id="pC" class="roster-select" placeholder="SELECT C"></select>
-                <select id="pD" class="roster-select" placeholder="SELECT D"></select>
-            </div>
-        </section>
+        <div class="grid grid-cols-2 gap-3">
+            <select id="pA" class="roster-select"></select><select id="pB" class="roster-select"></select>
+            <select id="pC" class="roster-select"></select><select id="pD" class="roster-select"></select>
+        </div>
 
-        <div class="mlb-card rounded-2xl overflow-hidden shadow-2xl">
-            <div id="score-table"></div>
-            <div class="p-3 bg-white/5 flex justify-between items-center border-t border-white/10">
-                <button id="add-row" class="text-[10px] font-black text-orange-500 border border-orange-500/30 px-4 py-2 rounded-full active:scale-95 transition-all uppercase tracking-tighter">+ Add New Match</button>
-                <div id="status-badge" class="text-[9px] font-mono text-slate-500 uppercase tracking-widest">Checking Integrity...</div>
+        <div class="mlb-table-container shadow-2xl rounded-sm">
+            <table id="entry-table">
+                <thead>
+                    <tr>
+                        <th style="width: 45px;">NO</th>
+                        <th>A</th><th>B</th><th>C</th><th>D</th>
+                        <th style="width: 50px;">BAL</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    </tbody>
+                <tfoot>
+                    <tr class="row-special" id="row-total">
+                        <td class="col-no">TOT</td><td id="tot-a">0</td><td id="tot-b">0</td><td id="tot-c">0</td><td id="tot-d">0</td><td></td>
+                    </tr>
+                    <tr class="row-special" id="row-diff">
+                        <td class="col-no">DIF</td><td id="dif-a">0</td><td id="dif-b">0</td><td id="dif-c">0</td><td id="dif-d">0</td><td></td>
+                    </tr>
+                    <tr class="row-special" id="row-tip">
+                        <td class="col-no">TIP</td>
+                        <td><input type="number" class="cell-input tip-input" data-col="a"></td>
+                        <td><input type="number" class="cell-input tip-input" data-col="b"></td>
+                        <td><input type="number" class="cell-input tip-input" data-col="c"></td>
+                        <td><input type="number" class="cell-input tip-input" data-col="d"></td>
+                        <td></td>
+                    </tr>
+                    <tr class="row-special" style="border-top: 2px solid #041e42;" id="row-coin">
+                        <td class="col-no">COIN</td>
+                        <td id="coin-a" style="color:#f97316">0</td>
+                        <td id="coin-b" style="color:#f97316">0</td>
+                        <td id="coin-c" style="color:#f97316">0</td>
+                        <td id="coin-d" style="color:#f97316">0</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+            <div class="p-3 bg-[#f8fafc] border-t flex justify-between">
+                <button id="add-row" class="text-[10px] font-black text-[#041e42] uppercase tracking-widest">+ Add Match</button>
+                <div id="status-badge" class="text-[9px] font-bold text-slate-400 uppercase">Analyzing...</div>
             </div>
         </div>
 
-        <button id="submit-btn" class="w-full py-5 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-2xl shadow-xl shadow-orange-900/20 transition-all active:scale-95 disabled:opacity-20 disabled:grayscale uppercase tracking-widest text-sm">
-            Finalize & Upload
-        </button>
+        <button id="submit-btn" class="w-full py-4 bg-[#041e42] text-white font-black rounded active:scale-95 transition-all uppercase tracking-widest text-xs disabled:opacity-20">Finalize Stats</button>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

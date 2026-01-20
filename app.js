@@ -5,9 +5,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let playerSelects = {};
 
-    // 1. プレイヤーマスター(playersテーブル)からデータを取得してTomSelectを初期化
+    // 1. プレイヤーマスターの初期化
     async function initRoster() {
-        const { data: players, error } = await sb.from('players').select('name');
+        const { data: players } = await sb.from('players').select('name');
         const options = players ? players.map(p => ({ value: p.name, text: p.name })) : [];
 
         ['pA', 'pB', 'pC', 'pD'].forEach(id => {
@@ -16,76 +16,57 @@ document.addEventListener('DOMContentLoaded', async () => {
                 create: true,
                 maxItems: 1,
                 render: {
-                    option_create: function(data, escape) {
-                        return '<div class="create">ADD NEW ROSTER: <strong>' + escape(data.input) + '</strong></div>';
-                    },
-                    no_results: function(data, escape) {
-                        return '<div class="no-results" style="padding: 10px; color: #64748b; font-size: 10px;">PRESS ENTER TO ADD "' + escape(data.input) + '"</div>';
-                    }
+                    option_create: (data, escape) => `<div class="create">ADD NEW: <strong>${escape(data.input)}</strong></div>`,
                 },
                 onChange: () => validateAll()
             });
         });
     }
 
-    // スコア入力用の共通設定
+    // スコア列の設定（数値型を維持）
     const createScoreColumn = (title, field) => ({
         title: title,
         field: field,
-        editor: "number",
+        editor: "number", // 数値型を維持（DB整合性のため）
         hozAlign: "center",
         headerSort: false,
         resizable: false, 
         editorParams: {
             elementAttributes: {
-                inputmode: "decimal", // 確実に「.」があるテンキーを出す
-            },
-            maskContents:true,
+                inputmode: "decimal", // テンキー表示
+            }
         },
-        // 【重要】ドットをマイナスに変換するロジック
-        cellEditing: function(cell) {
-            const input = cell.getElement().querySelector("input");
-            if (!input) return;
-
-            input.addEventListener("input", (e) => {
-                if (input.value.includes(".")) {
-                    // ドットが含まれていたらマイナスに置換
-                    input.value = input.value.replace(".", "-");
-                }
-            });
-        },
-        // ダブルタップ反転も補助として残しておく
+        // ダブルタップで正負を反転（数値として処理）
         cellDblClick: function(e, cell) {
             let val = cell.getValue();
-            if (val) {
-                cell.setValue(val * -1); 
+            if (val !== null && val !== undefined) {
+                cell.setValue(Number(val) * -1); 
                 validateAll();
             }
         }
     });
 
-    // 2. スコア表 (Tabulator) の定義
+    // 2. テーブル定義
     const table = new Tabulator("#score-table", {
         data: Array(4).fill().map(() => ({ a: null, b: null, c: null, d: null })),
         layout: "fitColumns",
-        headerVisible: true,
         columns: [
-            {title: "NO", formatter: "rownum", width: 40, hozAlign: "center", headerSort: false, resizable: false},
+            {title: "NO", formatter: "rownum", width: 40, hozAlign: "center", headerSort: false},
             createScoreColumn("A", "a"),
             createScoreColumn("B", "b"),
             createScoreColumn("C", "c"),
             createScoreColumn("D", "d"),
             {
-                title: "BAL", width: 50, hozAlign: "center", headerSort: false, resizable: false,
-                formatter: function(cell) {
+                title: "BAL", width: 50, hozAlign: "center", headerSort: false,
+                formatter: (cell) => {
                     const d = cell.getData();
                     const sum = (Number(d.a)||0) + (Number(d.b)||0) + (Number(d.c)||0) + (Number(d.d)||0);
-                    return sum === 0 ? "✅" : `<span style="color:#f87171; font-size:10px;">${sum > 0 ? '+' : ''}${sum}</span>`;
+                    return sum === 0 ? "✅" : `<span style="color:#f87171">${sum > 0 ? '+' : ''}${sum}</span>`;
                 },
-                cellClick: function(e, cell) {
+                cellClick: (e, cell) => {
                     const rowData = cell.getData();
-                    const currentSum = (Number(rowData.a)||0) + (Number(rowData.b)||0) + (Number(rowData.c)||0);
-                    cell.getRow().update({ d: -currentSum }); 
+                    const needed = -((Number(rowData.a)||0) + (Number(rowData.b)||0) + (Number(rowData.c)||0));
+                    cell.getRow().update({ d: needed });
                     validateAll();
                 }
             }
@@ -95,40 +76,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById("add-row").onclick = () => table.addRow({a:null, b:null, c:null, d:null});
 
-    // 3. バリデーション
     function validateAll() {
         const data = table.getData();
         const names = Object.values(playerSelects).map(s => s.getValue());
         const hasNames = names.every(n => n !== "");
-        
         let allRowsOk = true;
         data.forEach(row => {
             const sum = (Number(row.a)||0) + (Number(row.b)||0) + (Number(row.c)||0) + (Number(row.d)||0);
-            const hasData = (row.a !== null || row.b !== null || row.c !== null || row.d !== null);
-            if (hasData && sum !== 0) allRowsOk = false;
+            if ((row.a || row.b || row.c || row.d) && sum !== 0) allRowsOk = false;
         });
-
         const btn = document.getElementById('submit-btn');
         btn.disabled = !(hasNames && allRowsOk);
         document.getElementById('status-badge').innerText = btn.disabled ? "Check Inputs..." : "Ready to Sync";
     }
 
-    // 4. 保存処理
+    // 4. 保存処理（既存ロジックを維持）
     document.getElementById('submit-btn').onclick = async () => {
         const btn = document.getElementById('submit-btn');
-        btn.disabled = true; btn.innerText = "SYNCING TO CLOUD...";
-
+        btn.disabled = true; btn.innerText = "SYNCING...";
         try {
             const names = Object.values(playerSelects).map(s => s.getValue());
-            
             for(const name of names) {
                 await sb.from('players').upsert({ name: name }, { onConflict: 'name' });
             }
             const { data: playerMaster } = await sb.from('players').select('id, name').in('name', names);
-
             const { data: gameRecord, error: gErr } = await sb.from('games').insert({
-                player_names: names,
-                game_date: new Date().toISOString().split('T')[0]
+                player_names: names, game_date: new Date().toISOString().split('T')[0]
             }).select().single();
             if (gErr) throw gErr;
 
@@ -139,7 +112,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             for (const [idx, row] of rows.entries()) {
                 const scores = [Number(row.a)||0, Number(row.b)||0, Number(row.c)||0, Number(row.d)||0];
                 if (scores.every(s => s === 0)) continue;
-
                 const sorted = scores.map((s, i) => ({s, i})).sort((a,b) => b.s - a.s);
                 const ranks = new Array(4);
                 sorted.forEach((item, rIdx) => ranks[item.i] = rIdx + 1);
@@ -147,40 +119,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                 names.forEach((name, i) => {
                     const pInfo = playerMaster.find(m => m.name === name);
                     allResults.push({
-                        game_id: gameRecord.id,
-                        player_id: pInfo.id,
-                        player_name: name,
-                        score: scores[i],
-                        rank: ranks[i]
+                        game_id: gameRecord.id, player_id: pInfo.id, player_name: name,
+                        score: scores[i], rank: ranks[i]
                     });
                     totals[i] += scores[i];
                 });
             }
-
             await sb.from('game_results').insert(allResults);
 
             const fSorted = totals.map((s, i) => ({s, i})).sort((a,b) => b.s - a.s);
             const fRanks = new Array(4);
             fSorted.forEach((item, rIdx) => fRanks[item.i] = rIdx + 1);
-
-            const summaryRecords = names.map((name, i) => {
-                const pInfo = playerMaster.find(m => m.name === name);
-                return {
-                    game_id: gameRecord.id,
-                    player_id: pInfo.id,
-                    player_name: name,
-                    total_score: totals[i],
-                    final_rank: fRanks[i]
-                };
-            });
+            const summaryRecords = names.map((name, i) => ({
+                game_id: gameRecord.id, player_id: playerMaster.find(m => m.name === name).id,
+                player_name: name, total_score: totals[i], final_rank: fRanks[i]
+            }));
             await sb.from('set_summaries').insert(summaryRecords);
 
-            alert("SUCCESS: DATA SYNCED");
+            alert("SUCCESS");
             location.href = "history.html";
-
         } catch (err) {
-            alert("DB ERROR: " + err.message);
-            btn.disabled = false; btn.innerText = "RETRY UPLOAD";
+            alert(err.message);
+            btn.disabled = false; btn.innerText = "RETRY";
         }
     };
 

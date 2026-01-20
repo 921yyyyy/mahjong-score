@@ -58,6 +58,45 @@
 
     <script src="https://unpkg.com/@supabase/supabase-js@2" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/gridjs/dist/gridjs.umd.js" defer></script>
+    <div id="player-modal" class="fixed inset-0 z-50 bg-[#070d1c] overflow-y-auto hidden">
+    <div class="sticky top-0 bg-[#070d1c]/90 backdrop-blur-md p-4 border-b border-white/10 flex justify-between items-center">
+        <div>
+            <span class="text-[10px] text-orange-500 font-bold uppercase tracking-widest">Player Profile</span>
+            <h2 id="modal-player-name" class="text-2xl font-black italic uppercase tracking-tighter">PLAYER NAME</h2>
+        </div>
+        <button onclick="closePlayerModal()" class="text-slate-400 hover:text-white bg-white/5 w-10 h-10 rounded-full flex items-center justify-center font-bold">×</button>
+    </div>
+    
+    <div class="p-4 space-y-8">
+        <div class="grid grid-cols-3 gap-2">
+            <div class="bg-white/5 p-3 rounded border border-white/5 text-center">
+                <span class="text-[8px] text-slate-500 block uppercase">Match Avg</span>
+                <span id="stat-match-avg" class="text-lg font-black italic text-white">-</span>
+            </div>
+            <div class="bg-white/5 p-3 rounded border border-white/5 text-center">
+                <span class="text-[8px] text-slate-500 block uppercase">Sess Avg</span>
+                <span id="stat-sess-avg" class="text-lg font-black italic text-white">-</span>
+            </div>
+            <div class="bg-white/5 p-3 rounded border border-white/5 text-center">
+                <span class="text-[8px] text-slate-500 block uppercase">Chips/G</span>
+                <span id="stat-chips-avg" class="text-lg font-black italic text-orange-500">-</span>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <div class="bg-white/5 p-4 rounded-xl border border-white/10">
+                <h3 class="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em] mb-4">Last 10 Matches Trend</h3>
+                <canvas id="matchChart" height="200"></canvas>
+            </div>
+
+            <div class="bg-white/5 p-4 rounded-xl border border-white/10">
+                <h3 class="text-[9px] font-black text-orange-500 uppercase tracking-[0.2em] mb-4">Last 10 Sessions Trend</h3>
+                <canvas id="sessChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
     <script src="navbar.js" defer></script>
 
     <script>

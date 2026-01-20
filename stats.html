@@ -211,7 +211,7 @@
 
         // --- Matchグラフ描画 (最新順を反転させて過去→最新にする) ---
         if (mData && mData.length > 0) {
-            const revM = mData.slice().reverse(); 
+            const revM = mData.slice(); 
             renderAdvancedChart('matchChart', revM.map(d=>d.rank), revM.map(d=>d.score), '#3b82f6', 'match');
             const avg = (revM.reduce((a, b) => a + b.rank, 0) / revM.length).toFixed(2);
             document.getElementById('stat-match-avg').innerText = avg;
@@ -219,7 +219,7 @@
 
         // --- Sessionグラフ描画 (最新順を反転させて過去→最新にする) ---
         if (sData && sData.length > 0) {
-            const revS = sData.slice().reverse(); 
+            const revS = sData.slice(); 
             renderAdvancedChart('sessChart', revS.map(d=>d.final_rank), revS.map(d=>d.total_score), '#f97316', 'sess');
             const sAvg = (revS.reduce((a, b) => a + (b.final_rank||0), 0) / revS.length).toFixed(2);
             document.getElementById('stat-sess-avg').innerText = sAvg;

@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // スコア入力用の共通設定（数字キーボード強制 & ダブルタップ反転）
+    // スコア入力用の共通設定
     const createScoreColumn = (title, field) => ({
         title: title,
         field: field,
@@ -38,11 +38,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         resizable: false, 
         editorParams: {
             elementAttributes: {
-                // ここを修正：textモードにすることでマイナス記号の入力を許可しやすくします
-                inputmode: "text", 
-                type: "text" // number型だとマイナスが弾かれる場合があるためtextで受ける
-            }
+                inputmode: "decimal", // 確実に「.」があるテンキーを出す
+            },
+            maskContents:true,
         },
+        // 【重要】ドットをマイナスに変換するロジック
+        cellEditing: function(cell) {
+            const input = cell.getElement().querySelector("input");
+            if (!input) return;
+
+            input.addEventListener("input", (e) => {
+                if (input.value.includes(".")) {
+                    // ドットが含まれていたらマイナスに置換
+                    input.value = input.value.replace(".", "-");
+                }
+            });
+        },
+        // ダブルタップ反転も補助として残しておく
         cellDblClick: function(e, cell) {
             let val = cell.getValue();
             if (val) {
@@ -83,7 +95,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById("add-row").onclick = () => table.addRow({a:null, b:null, c:null, d:null});
 
-    // 3. バリデーション（保存ボタンの制御）
+    // 3. バリデーション
     function validateAll() {
         const data = table.getData();
         const names = Object.values(playerSelects).map(s => s.getValue());

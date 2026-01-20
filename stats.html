@@ -67,7 +67,7 @@
         <button onclick="closePlayerModal()" class="text-slate-400 hover:text-white bg-white/5 w-10 h-10 rounded-full flex items-center justify-center font-bold">×</button>
     </div>
     
-    <div class="p-4 space-y-8">
+    <div class="p-4 space-y-6">
         <div class="grid grid-cols-3 gap-2">
             <div class="bg-white/5 p-3 rounded border border-white/5 text-center">
                 <span class="text-[8px] text-slate-500 block uppercase">Match Avg</span>
@@ -83,21 +83,24 @@
             </div>
         </div>
 
-       <div class="space-y-6">
-    <div class="bg-white/5 p-4 rounded-xl border border-white/10">
-        <h3 class="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em] mb-4">Last 10 Matches Trend</h3>
-        <div class="h-[200px] relative">
-            <canvas id="matchChart"></canvas>
-        </div>
-    </div>
+        <div class="space-y-6">
+            <div class="bg-white/5 p-4 rounded-xl border border-white/10">
+                <h3 class="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em] mb-4">Last 20 Matches (Rank & Pts)</h3>
+                <div class="h-[250px] relative">
+                    <canvas id="matchChart"></canvas>
+                </div>
+            </div>
 
-    <div class="bg-white/5 p-4 rounded-xl border border-white/10">
-        <h3 class="text-[9px] font-black text-orange-500 uppercase tracking-[0.2em] mb-4">Last 10 Sessions Trend</h3>
-        <div class="h-[200px] relative">
-            <canvas id="sessChart"></canvas>
+            <div class="bg-white/5 p-4 rounded-xl border border-white/10">
+                <h3 class="text-[9px] font-black text-orange-500 uppercase tracking-[0.2em] mb-4">Last 10 Sessions (Rank & Pts)</h3>
+                <div class="h-[250px] relative">
+                    <canvas id="sessChart"></canvas>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
 
 </div>
 
@@ -214,96 +217,108 @@
     // ※ ここに以前お送りした showPlayerDetail と renderChart, closePlayerModal を追加してください
 
     // --- プレイヤー詳細モーダル用ロジック ---
-    window.showPlayerDetail = async function(playerName) {
-        const modal = document.getElementById('player-modal');
-        document.getElementById('modal-player-name').innerText = playerName;
-        modal.classList.remove('hidden');
+    .// 変数を2つ用意
+let matchChartObj = null;
+let sessChartObj = null;
 
-        try {
-            // Matchトレンド (直近10件)
-            const { data: mData } = await sb.from('game_results')
-                .select('rank')
-                .eq('player_name', playerName)
-                .order('created_at', { ascending: false })
-                .limit(10);
+window.showPlayerDetail = async function(playerName) {
+    const modal = document.getElementById('player-modal');
+    document.getElementById('modal-player-name').innerText = playerName;
+    modal.classList.remove('hidden');
 
-            // Sessionトレンド (直近10件)
-            const { data: sData } = await sb.from('set_summaries')
-                .select('total_score, tips')
-                .eq('player_name', playerName)
-                .order('created_at', { ascending: false })
-                .limit(10);
+    try {
+        // 1. Matchデータ取得 (直近20件)
+        const { data: mData } = await sb.from('game_results')
+            .select('rank, score')
+            .eq('player_name', playerName)
+            .order('created_at', { ascending: false }).limit(20);
 
-            const matchRanks = mData ? mData.map(d => d.rank).reverse() : [];
-            const sessScores = sData ? sData.map(d => d.total_score).reverse() : [];
+        // 2. Sessionデータ取得 (直近10件)
+        const { data: sData } = await sb.from('set_summaries')
+            .select('total_score, final_rank')
+            .eq('player_name', playerName)
+            .order('created_at', { ascending: false }).limit(10);
 
-            // モーダル内スタッツ更新
-            if (matchRanks.length > 0) {
-                const matchAvg = (matchRanks.reduce((a, b) => a + b, 0) / matchRanks.length).toFixed(2);
-                document.getElementById('stat-match-avg').innerText = matchAvg;
-            }
-            document.getElementById('stat-sess-avg').innerText = sData && sData[0] ? sData[0].total_score : 0;
-            
-            // グラフ描画
-            renderChart('matchChart', matchRanks, '#3b82f6', 'Match Rank', true);
-            renderChart('sessChart', sessScores, '#f97316', 'Session Pts', false);
+        // --- Matchグラフ描画 ---
+        if (mData) {
+            const revM = mData.reverse();
+            renderAdvancedChart('matchChart', revM.map(d=>d.rank), revM.map(d=>d.score), '#3b82f6', 'match');
+            const avg = (revM.reduce((a, b) => a + b.rank, 0) / revM.length).toFixed(2);
+            document.getElementById('stat-match-avg').innerText = avg;
+        }
 
-        } catch (e) { console.error('Error fetching details:', e); }
-    };
+        // --- Sessionグラフ描画 ---
+        if (sData) {
+            const revS = sData.reverse();
+            renderAdvancedChart('sessChart', revS.map(d=>d.final_rank), revS.map(d=>d.total_score), '#f97316', 'sess');
+            const sAvg = (revS.reduce((a, b) => a + (b.final_rank||0), 0) / revS.length).toFixed(2);
+            document.getElementById('stat-sess-avg').innerText = sAvg;
+        }
 
-    function renderChart(canvasId, data, color, label, isRank) {
-        const ctx = document.getElementById(canvasId).getContext('2d');
-        
-        if (canvasId === 'matchChart' && matchChartObj) matchChartObj.destroy();
-        if (canvasId === 'sessChart' && sessChartObj) sessChartObj.destroy();
+    } catch (e) { console.error(e); }
+};
 
-        const newChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.map((_, i) => i + 1),
-                datasets: [{
-                    label: label,
-                    data: data,
-                    borderColor: color,
-                    backgroundColor: color + '33',
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 5,
-                    pointBackgroundColor: color,
-                    borderWidth: 3
-                }]
-            },
-            // renderChart 関数の options 部分を微調整
-options: {
-    responsive: true,
-    maintainAspectRatio: false, // これが重要！
-    scales: {
-        y: {
-            reverse: isRank,
-            // 順位グラフ(Match)の場合の調整
-            min: isRank ? 0.5 : undefined, // 1より少し上に余裕を持たせる
-            max: isRank ? 4.5 : undefined, // 4より少し下に余裕を持たせる
-            grid: { color: 'rgba(255,255,255,0.05)' },
-            ticks: { 
-                color: '#94a3b8', 
-                stepSize: 1,
-                // 0.5とか4.5を表示しないようにする
-                callback: function(value) {
-                    if (value % 1 === 0) return value;
+function renderAdvancedChart(canvasId, ranks, scores, themeColor, type) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    
+    // 既存のチャートを破棄
+    if (type === 'match' && matchChartObj) matchChartObj.destroy();
+    if (type === 'sess' && sessChartObj) sessChartObj.destroy();
+
+    const newChart = new Chart(ctx, {
+        data: {
+            labels: ranks.map((_, i) => i + 1),
+            datasets: [
+                {
+                    type: 'line',
+                    label: 'Rank',
+                    data: ranks,
+                    borderColor: themeColor,
+                    borderWidth: 4,
+                    pointRadius: 6,
+                    pointBackgroundColor: themeColor,
+                    tension: 0.3,
+                    yAxisID: 'yRank',
+                    zIndex: 2
+                },
+                {
+                    type: 'bar',
+                    label: 'Score',
+                    data: scores,
+                    backgroundColor: themeColor + '33', // 透明度あり
+                    yAxisID: 'yScore',
+                    zIndex: 1,
+                    barThickness: 8
                 }
-            }
+            ]
         },
-        x: { display: false }
-    },
-    // ...以下同じ
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 1500, easing: 'easeInOutQuart' },
+            scales: {
+                yRank: {
+                    position: 'left',
+                    reverse: true, // 1位を上にする
+                    min: 0.5, max: 4.5,
+                    ticks: { color: themeColor, stepSize: 1, font: { weight: 'bold' } },
+                    grid: { color: 'rgba(255,255,255,0.1)' }
+                },
+                yScore: {
+                    position: 'right',
+                    ticks: { color: '#64748b' },
+                    grid: { display: false }
+                },
+                x: { ticks: { color: '#64748b' }, grid: { display: false } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
 
-                plugins: { legend: { display: false } }
-            }
-        });
+    if (type === 'match') matchChartObj = newChart;
+    if (type === 'sess') sessChartObj = newChart;
+}
 
-        if (canvasId === 'matchChart') matchChartObj = newChart;
-        if (canvasId === 'sessChart') sessChartObj = newChart;
-    }
 
     window.closePlayerModal = () => {
         document.getElementById('player-modal').classList.add('hidden');

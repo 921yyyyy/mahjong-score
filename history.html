@@ -81,28 +81,34 @@
                 const swiperWrapper = document.getElementById('history-swiper-wrapper');
                 const historyList = document.getElementById('history-list');
 
-                // 各セッションを表示
-                Object.keys(sessions).forEach((gId, index) => {
+                                // --- 修正ポイント：reverse() を追加して降順（新しい順）にする ---
+                const sessionIds = Object.keys(sessions).reverse();
+
+                sessionIds.forEach((gId, index) => {
                     const sessionRows = sessions[gId];
-                    // --- 修正ポイント2: 0位を回避。スコア順に並び替えてリアルタイムに順位を振る ---
+                    // スコア順に並び替えてリアルタイムに順位を振る
                     sessionRows.sort((a, b) => b.total_score - a.total_score);
                     
-                    // 表示用の日付（最初の1人のデータから取得）
+                    // 表示用の日付
                     const date = new Date(sessionRows[0].created_at).toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' });
                     
                     const cardHtml = createSessionCard(sessionRows, date, gId);
 
+                    // Swiper（直近5セッション）
                     if (index < 5) {
                         const slide = document.createElement('div');
                         slide.className = 'swiper-slide';
                         slide.innerHTML = cardHtml;
                         swiperWrapper.appendChild(slide);
                     }
+                    
+                    // All Logs（全履歴を新しい順に）
                     const listItem = document.createElement('div');
-                    listItem.className = 'list-item-card p-4 rounded-r-lg mb-6'; // 余白追加
+                    listItem.className = 'list-item-card p-4 rounded-r-lg mb-6'; 
                     listItem.innerHTML = cardHtml;
                     historyList.appendChild(listItem);
                 });
+
 
                 new Swiper(".mySwiper", {
                     effect: "coverflow",

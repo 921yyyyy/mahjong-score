@@ -19,38 +19,58 @@ document.addEventListener('DOMContentLoaded', async () => {
                     option_create: (data, escape) => `<div class="create">ADD NEW: <strong>${escape(data.input)}</strong></div>`,
                 },
                 onChange: () => {
-                    updatePlayerTotals(); // プレイヤー名変更時も合計を更新
                     validateAll();
                 }
             });
         });
     }
 
-    // セッション合計（プレイヤーごとの合計値）を表示する関数
-    function updatePlayerTotals() {
+    // セッション合計や各種計算の更新
+    function updateCalculations() {
         const data = table.getData();
-        const totals = { a: 0, b: 0, c: 0, d: 0 };
-        
-        data.forEach(row => {
-            totals.a += Number(row.a) || 0;
-            totals.b += Number(row.b) || 0;
-            totals.c += Number(row.c) || 0;
-            totals.d += Number(row.d) || 0;
-        });
+        const scoreTotals = { a: 0, b: 0, c: 0, d: 0 };
+        const tips = { a: 0, b: 0, c: 0, d: 0 };
 
-        // 画面上の合計表示エリアを更新（もしHTML側にIDがあれば反映）
-        ['a', 'b', 'c', 'd'].forEach(id => {
-            const el = document.getElementById(`total-${id}`);
-            if (el) {
-                el.innerText = totals[id];
-                el.style.color = totals[id] >= 0 ? "#60a5fa" : "#f87171"; // 青または赤
+        data.forEach(row => {
+            if(row.type === "score") {
+                scoreTotals.a += Number(row.a) || 0;
+                scoreTotals.b += Number(row.b) || 0;
+                scoreTotals.c += Number(row.c) || 0;
+                scoreTotals.d += Number(row.d) || 0;
+            } else if(row.type === "tip") {
+                tips.a = Number(row.a) || 0;
+                tips.b = Number(row.b) || 0;
+                tips.c = Number(row.c) || 0;
+                tips.d = Number(row.d) || 0;
             }
         });
-        
-        // Tabulatorのフッターに合計を表示する設定（テーブル定義側で対応）
+
+        const totalsArray = [scoreTotals.a, scoreTotals.b, scoreTotals.c, scoreTotals.d];
+        const maxScore = Math.max(...totalsArray);
+
+        // Diff(点数差), Coin(計算) の行を特定して更新
+        const rows = table.getRows();
+        rows.forEach(row => {
+            const rowData = row.getData();
+            if(rowData.type === "diff") {
+                row.update({
+                    a: scoreTotals.a - maxScore,
+                    b: scoreTotals.b - maxScore,
+                    c: scoreTotals.c - maxScore,
+                    d: scoreTotals.d - maxScore
+                });
+            } else if(rowData.type === "coin") {
+                row.update({
+                    a: (scoreTotals.a * 20) + (tips.a * 50),
+                    b: (scoreTotals.b * 20) + (tips.b * 50),
+                    c: (scoreTotals.c * 20) + (tips.c * 50),
+                    d: (scoreTotals.d * 20) + (tips.d * 50)
+                });
+            }
+        });
     }
 
-    // スコア列の設定
+    // 列設定の共通関数
     const createScoreColumn = (title, field) => ({
         title: title,
         field: field,
@@ -58,20 +78,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         hozAlign: "center",
         headerSort: false,
         resizable: false,
-        bottomCalc: "sum", // プレイヤーごとの合計値を表示
-        editorParams: {
-            elementAttributes: { inputmode: "decimal" }
+        editorParams: { elementAttributes: { inputmode: "decimal" } },
+        editable: (cell) => {
+            const rowData = cell.getRow().getData();
+            return rowData.type === "score" || rowData.type === "tip";
         },
-        // スコアの色分け：プラスは青系、マイナスは赤系
         formatter: function(cell) {
             const val = cell.getValue();
+            const rowData = cell.getRow().getData();
+            
+            // フッター（合計・計算行）の背景色と同化しないようにスタイル調整
+            if (rowData.type !== "score") {
+                cell.getElement().style.backgroundColor = "#2d3748";
+                cell.getElement().style.color = "#ffffff";
+                cell.getElement().style.fontWeight = "bold";
+            }
+
             if (val > 0) return `<span style="color:#60a5fa; font-weight:800;">+${val}</span>`;
             if (val < 0) return `<span style="color:#f87171; font-weight:800;">${val}</span>`;
             return val === 0 ? "0" : "";
         },
         cellDblClick: function(e, cell) {
             let val = cell.getValue();
-            if (val) {
+            if (val && (cell.getRow().getData().type === "score" || cell.getRow().getData().type === "tip")) {
                 cell.setValue(Number(val) * -1);
                 validateAll();
             }
@@ -80,27 +109,44 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 2. スコア表 (Tabulator) の定義
     const table = new Tabulator("#score-table", {
-        data: Array(4).fill().map(() => ({ a: null, b: null, c: null, d: null })),
+        data: [
+            {type: "score", a: null, b: null, c: null, d: null},
+            {type: "score", a: null, b: null, c: null, d: null},
+            {type: "score", a: null, b: null, c: null, d: null},
+            {type: "score", a: null, b: null, c: null, d: null},
+            {type: "diff", label: "DIFF", a: 0, b: 0, c: 0, d: 0},
+            {type: "tip", label: "TIP", a: 0, b: 0, c: 0, d: 0},
+            {type: "coin", label: "COIN", a: 0, b: 0, c: 0, d: 0}
+        ],
         layout: "fitColumns",
-        columnDefaults: { tooltip: false },
         columns: [
-            {title: "NO", formatter: "rownum", width: 40, hozAlign: "center", headerSort: false, resizable: false},
+            {
+                title: "NO", 
+                field: "label",
+                width: 40, 
+                hozAlign: "center", 
+                headerSort: false,
+                formatter: (cell) => {
+                    const data = cell.getRow().getData();
+                    return data.type === "score" ? cell.getRow().getPosition() : `<strong>${data.label}</strong>`;
+                }
+            },
             createScoreColumn("A", "a"),
             createScoreColumn("B", "b"),
             createScoreColumn("C", "c"),
             createScoreColumn("D", "d"),
             {
-                title: "BAL", width: 50, hozAlign: "center", headerSort: false, resizable: false,
+                title: "BAL", width: 50, hozAlign: "center", headerSort: false,
                 formatter: function(cell) {
                     const d = cell.getData();
+                    if(d.type !== "score") return "";
                     const sum = (Number(d.a)||0) + (Number(d.b)||0) + (Number(d.c)||0) + (Number(d.d)||0);
                     return sum === 0 ? "✅" : `<span style="color:#f87171; font-size:10px;">${sum > 0 ? '+' : ''}${sum}</span>`;
                 },
-                // バグ修正：正確な不足分を算出してDに代入する
                 cellClick: function(e, cell) {
                     const row = cell.getRow();
                     const d = row.getData();
-                    // A, B, C の合計を計算し、その逆数を D に設定する
+                    if(d.type !== "score") return;
                     const currentSumABC = (Number(d.a)||0) + (Number(d.b)||0) + (Number(d.c)||0);
                     row.update({ d: -currentSumABC });
                     validateAll();
@@ -108,12 +154,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         ],
         cellEdited: () => {
-            updatePlayerTotals();
+            updateCalculations();
             validateAll();
         }
     });
 
-    document.getElementById("add-row").onclick = () => table.addRow({a:null, b:null, c:null, d:null});
+    document.getElementById("add-row").onclick = () => {
+        // スコア行をチップ行の前に追加する
+        const tipRow = table.getRows().find(r => r.getData().type === "tip");
+        table.addRow({type: "score", a:null, b:null, c:null, d:null}, false, tipRow);
+    };
 
     // 3. バリデーション
     function validateAll() {
@@ -123,9 +173,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         let allRowsOk = true;
         data.forEach(row => {
-            const sum = (Number(row.a)||0) + (Number(row.b)||0) + (Number(row.c)||0) + (Number(row.d)||0);
-            const hasData = (row.a !== null || row.b !== null || row.c !== null || row.d !== null);
-            if (hasData && sum !== 0) allRowsOk = false;
+            if(row.type === "score") {
+                const sum = (Number(row.a)||0) + (Number(row.b)||0) + (Number(row.c)||0) + (Number(row.d)||0);
+                const hasData = (row.a !== null || row.b !== null || row.c !== null || row.d !== null);
+                if (hasData && sum !== 0) allRowsOk = false;
+            }
         });
 
         const btn = document.getElementById('submit-btn');
@@ -136,11 +188,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 4. 保存処理
     document.getElementById('submit-btn').onclick = async () => {
         const btn = document.getElementById('submit-btn');
-        btn.disabled = true; btn.innerText = "SYNCING TO CLOUD...";
+        btn.disabled = true; btn.innerText = "SYNCING...";
 
         try {
             const names = Object.values(playerSelects).map(s => s.getValue());
-            
             for(const name of names) {
                 await sb.from('players').upsert({ name: name }, { onConflict: 'name' });
             }
@@ -153,54 +204,61 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (gErr) throw gErr;
 
             const rows = table.getData();
+            const scoreTotals = [0, 0, 0, 0];
+            const tips = [0, 0, 0, 0];
+            const coins = [0, 0, 0, 0];
             const allResults = [];
-            const totals = [0, 0, 0, 0];
 
-            for (const [idx, row] of rows.entries()) {
-                const scores = [Number(row.a)||0, Number(row.b)||0, Number(row.c)||0, Number(row.d)||0];
-                if (scores.every(s => s === 0)) continue;
+            // データの仕分け
+            rows.forEach(row => {
+                const vals = [Number(row.a)||0, Number(row.b)||0, Number(row.c)||0, Number(row.d)||0];
+                if(row.type === "score") {
+                    if (vals.every(v => v === 0)) return;
+                    
+                    const sorted = vals.map((s, i) => ({s, i})).sort((a,b) => b.s - a.s);
+                    const ranks = new Array(4);
+                    sorted.forEach((item, rIdx) => ranks[item.i] = rIdx + 1);
 
-                const sorted = scores.map((s, i) => ({s, i})).sort((a,b) => b.s - a.s);
-                const ranks = new Array(4);
-                sorted.forEach((item, rIdx) => ranks[item.i] = rIdx + 1);
-
-                names.forEach((name, i) => {
-                    const pInfo = playerMaster.find(m => m.name === name);
-                    allResults.push({
-                        game_id: gameRecord.id,
-                        player_id: pInfo.id,
-                        player_name: name,
-                        score: scores[i],
-                        rank: ranks[i]
+                    names.forEach((name, i) => {
+                        allResults.push({
+                            game_id: gameRecord.id,
+                            player_id: playerMaster.find(m => m.name === name).id,
+                            player_name: name,
+                            score: vals[i],
+                            rank: ranks[i]
+                        });
+                        scoreTotals[i] += vals[i];
                     });
-                    totals[i] += scores[i];
-                });
-            }
+                } else if(row.type === "tip") {
+                    vals.forEach((v, i) => tips[i] = v);
+                } else if(row.type === "coin") {
+                    vals.forEach((v, i) => coins[i] = v);
+                }
+            });
 
             await sb.from('game_results').insert(allResults);
 
-            const fSorted = totals.map((s, i) => ({s, i})).sort((a,b) => b.s - a.s);
+            const fSorted = scoreTotals.map((s, i) => ({s, i})).sort((a,b) => b.s - a.s);
             const fRanks = new Array(4);
             fSorted.forEach((item, rIdx) => fRanks[item.i] = rIdx + 1);
 
-            const summaryRecords = names.map((name, i) => {
-                const pInfo = playerMaster.find(m => m.name === name);
-                return {
-                    game_id: gameRecord.id,
-                    player_id: pInfo.id,
-                    player_name: name,
-                    total_score: totals[i],
-                    final_rank: fRanks[i]
-                };
-            });
+            const summaryRecords = names.map((name, i) => ({
+                game_id: gameRecord.id,
+                player_id: playerMaster.find(m => m.name === name).id,
+                player_name: name,
+                total_score: scoreTotals[i],
+                final_rank: fRanks[i],
+                tips: tips[i], // 追加カラム
+                coins: coins[i] // 追加カラム
+            }));
             await sb.from('set_summaries').insert(summaryRecords);
 
-            alert("SUCCESS: DATA SYNCED");
+            alert("SUCCESS");
             location.href = "history.html";
 
         } catch (err) {
             alert("DB ERROR: " + err.message);
-            btn.disabled = false; btn.innerText = "RETRY UPLOAD";
+            btn.disabled = false;
         }
     };
 

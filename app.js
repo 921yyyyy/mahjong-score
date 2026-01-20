@@ -158,20 +158,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('status-badge').innerText = btn.disabled ? "Checking Stats..." : "Ready to Sync";
     }
 
-    document.getElementById('submit-btn').onclick = async () => {
+        document.getElementById('submit-btn').onclick = async () => {
         const btn = document.getElementById('submit-btn');
+        
+        // ★ここから追加・変更
+        const selectedDateStr = document.getElementById('game-date').value; 
+        const gameTime = new Date();
+        const [year, month, day] = selectedDateStr.split('-');
+        gameTime.setFullYear(year, month - 1, day);
+        const finalTimestamp = gameTime.toISOString();
+        // ★ここまで追加・変更
+
         btn.disabled = true; btn.innerText = "SYNCING...";
         try {
             const names = Object.values(playerSelects).map(s => s.getValue());
             for(const n of names) await sb.from('players').upsert({ name: n }, { onConflict: 'name' });
             const { data: mstr } = await sb.from('players').select('id, name').in('name', names);
-            const { data: game, error: gErr } = await sb.from('games').insert({ player_names: names, game_date: new Date().toISOString().split('T')[0] }).select().single();
+            
+            // ★ game_date と created_at を上書き
+            const { data: game, error: gErr } = await sb.from('games').insert({ 
+                player_names: names, 
+                game_date: selectedDateStr,
+                created_at: finalTimestamp 
+            }).select().single();
             if (gErr) throw gErr;
 
             const results = [];
             document.querySelectorAll('.match-row').forEach(row => {
                 const inputs = Array.from(row.querySelectorAll('.sc-in'));
-                if(inputs.every(i => i.value === "")) return; // 空行はスキップ
+                if(inputs.every(i => i.value === "")) return; 
                 const vals = inputs.map(i => Number(i.value) || 0);
                 const sorted = [...vals].sort((a, b) => b - a);
                 names.forEach((name, i) => {
@@ -180,7 +195,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         player_id: mstr.find(m => m.name === name).id,
                         player_name: name,
                         score: vals[i],
-                        rank: sorted.indexOf(vals[i]) + 1
+                        rank: sorted.indexOf(vals[i]) + 1,
+                        created_at: finalTimestamp // ★追加
                     });
                 });
             });
@@ -192,8 +208,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 total_score: Number(document.getElementById(`tot-${['a','b','c','d'][i]}`).innerText),
                 tips: Number(document.querySelector(`.tip-in[data-col="${['a','b','c','d'][i]}"]`).value) || 0,
                 coins: Number(document.getElementById(`coin-${['a','b','c','d'][i]}`).innerText),
-                final_rank: 0 
+                final_rank: 0,
+                created_at: finalTimestamp // ★追加
             }));
+// 以下、既存の insert 処理へ続く...
+
 
             await sb.from('game_results').insert(results);
             await sb.from('set_summaries').insert(summaries);

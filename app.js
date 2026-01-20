@@ -11,25 +11,44 @@ document.addEventListener('DOMContentLoaded', async () => {
         const options = players ? players.map(p => ({ value: p.name, text: p.name })) : [];
 
         ['pA', 'pB', 'pC', 'pD'].forEach(id => {
-           // app.js 内の TomSelect 初期化部分を以下のように微調整
-playerSelects[id] = new TomSelect(`#${id}`, {
-    options: options,
-    create: true,
-    maxItems: 1,
-    // 追加：新規作成時の表示をよりリッチにする
-    render: {
-        option_create: function(data, escape) {
-            return '<div class="create">ADD NEW ROSTER: <strong>' + escape(data.input) + '</strong></div>';
-        },
-        no_results: function(data, escape) {
-            return '<div class="no-results" style="padding: 10px; color: #64748b; font-size: 10px;">PRESS ENTER TO ADD "' + escape(data.input) + '"</div>';
-        }
-    },
-    onChange: () => validateAll()
-});
-
+            playerSelects[id] = new TomSelect(`#${id}`, {
+                options: options,
+                create: true,
+                maxItems: 1,
+                render: {
+                    option_create: function(data, escape) {
+                        return '<div class="create">ADD NEW ROSTER: <strong>' + escape(data.input) + '</strong></div>';
+                    },
+                    no_results: function(data, escape) {
+                        return '<div class="no-results" style="padding: 10px; color: #64748b; font-size: 10px;">PRESS ENTER TO ADD "' + escape(data.input) + '"</div>';
+                    }
+                },
+                onChange: () => validateAll()
+            });
         });
     }
+
+    // スコア入力用の共通設定（数字キーボード強制 & ダブルタップ反転）
+    const createScoreColumn = (title, field) => ({
+        title: title,
+        field: field,
+        editor: "number",
+        hozAlign: "center",
+        headerSort: false,
+        resizable: false, 
+        editorParams: {
+            elementAttributes: {
+                inputmode: "decimal", // スマホで数字キーボードを出す
+            }
+        },
+        cellDblClick: function(e, cell) {
+            let val = cell.getValue();
+            if (val) {
+                cell.setValue(val * -1); // プラスマイナス反転
+                validateAll();
+            }
+        }
+    });
 
     // 2. スコア表 (Tabulator) の定義
     const table = new Tabulator("#score-table", {
@@ -37,17 +56,23 @@ playerSelects[id] = new TomSelect(`#${id}`, {
         layout: "fitColumns",
         headerVisible: true,
         columns: [
-            {title: "NO", formatter: "rownum", width: 40, hozAlign: "center", headerSort: false},
-            {title: "A", field: "a", editor: "number", hozAlign: "center", headerSort: false},
-            {title: "B", field: "b", editor: "number", hozAlign: "center", headerSort: false},
-            {title: "C", field: "c", editor: "number", hozAlign: "center", headerSort: false},
-            {title: "D", field: "d", editor: "number", hozAlign: "center", headerSort: false},
+            {title: "NO", formatter: "rownum", width: 40, hozAlign: "center", headerSort: false, resizable: false},
+            createScoreColumn("A", "a"),
+            createScoreColumn("B", "b"),
+            createScoreColumn("C", "c"),
+            createScoreColumn("D", "d"),
             {
-                title: "BAL", width: 50, hozAlign: "center", headerSort: false,
+                title: "BAL", width: 50, hozAlign: "center", headerSort: false, resizable: false,
                 formatter: function(cell) {
                     const d = cell.getData();
                     const sum = (Number(d.a)||0) + (Number(d.b)||0) + (Number(d.c)||0) + (Number(d.d)||0);
-                    return sum === 0 ? "✅" : "❌";
+                    return sum === 0 ? "✅" : `<span style="color:#f87171; font-size:10px;">${sum > 0 ? '+' : ''}${sum}</span>`;
+                },
+                cellClick: function(e, cell) {
+                    const rowData = cell.getData();
+                    const currentSum = (Number(rowData.a)||0) + (Number(rowData.b)||0) + (Number(rowData.c)||0);
+                    cell.getRow().update({ d: -currentSum }); // 自動整列ロジック
+                    validateAll();
                 }
             }
         ],
@@ -82,13 +107,11 @@ playerSelects[id] = new TomSelect(`#${id}`, {
         try {
             const names = Object.values(playerSelects).map(s => s.getValue());
             
-            // ① playersテーブルへの登録/更新（playerマスターを活かす）
             for(const name of names) {
                 await sb.from('players').upsert({ name: name }, { onConflict: 'name' });
             }
             const { data: playerMaster } = await sb.from('players').select('id, name').in('name', names);
 
-            // ② gamesテーブルへの親レコード登録
             const { data: gameRecord, error: gErr } = await sb.from('games').insert({
                 player_names: names,
                 game_date: new Date().toISOString().split('T')[0]
@@ -99,12 +122,10 @@ playerSelects[id] = new TomSelect(`#${id}`, {
             const allResults = [];
             const totals = [0, 0, 0, 0];
 
-            // ③ 各行を Match として解析して明細保存
             for (const [idx, row] of rows.entries()) {
                 const scores = [Number(row.a)||0, Number(row.b)||0, Number(row.c)||0, Number(row.d)||0];
                 if (scores.every(s => s === 0)) continue;
 
-                // 順位計算
                 const sorted = scores.map((s, i) => ({s, i})).sort((a,b) => b.s - a.s);
                 const ranks = new Array(4);
                 sorted.forEach((item, rIdx) => ranks[item.i] = rIdx + 1);
@@ -112,8 +133,8 @@ playerSelects[id] = new TomSelect(`#${id}`, {
                 names.forEach((name, i) => {
                     const pInfo = playerMaster.find(m => m.name === name);
                     allResults.push({
-                        game_id: gameRecord.id, // 親ID紐付け
-                        player_id: pInfo.id,    // playerテーブルのID紐付け
+                        game_id: gameRecord.id,
+                        player_id: pInfo.id,
                         player_name: name,
                         score: scores[i],
                         rank: ranks[i]
@@ -122,7 +143,6 @@ playerSelects[id] = new TomSelect(`#${id}`, {
                 });
             }
 
-            // ④ game_results と set_summaries へ一括保存
             await sb.from('game_results').insert(allResults);
 
             const fSorted = totals.map((s, i) => ({s, i})).sort((a,b) => b.s - a.s);

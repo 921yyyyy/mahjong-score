@@ -64,24 +64,33 @@
         const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs';
         const sb = window.supabase.createClient(S_URL, S_KEY);
 
-        async function initHistory() {
+                async function initHistory() {
             try {
                 const { data: sessionData, error } = await sb.from('set_summaries').select('*').order('created_at', { ascending: false });
                 if (error) throw error;
 
+                // --- 修正ポイント1: game_id でグルーピングする ---
+                // 日付だと秒単位のズレで別人扱いになるため、確実に同じセッションを指す game_id を使います
                 const sessions = {};
                 sessionData.forEach(row => {
-                    const d = new Date(row.created_at).toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' });
-                    if (!sessions[d]) sessions[d] = [];
-                    sessions[d].push(row);
+                    const gId = row.game_id;
+                    if (!sessions[gId]) sessions[gId] = [];
+                    sessions[gId].push(row);
                 });
 
                 const swiperWrapper = document.getElementById('history-swiper-wrapper');
                 const historyList = document.getElementById('history-list');
 
-                Object.keys(sessions).forEach((date, index) => {
-                    const players = sessions[date].sort((a,b) => a.final_rank - b.final_rank);
-                    const cardHtml = createSessionCard(players, date);
+                // 各セッションを表示
+                Object.keys(sessions).forEach((gId, index) => {
+                    const sessionRows = sessions[gId];
+                    // --- 修正ポイント2: 0位を回避。スコア順に並び替えてリアルタイムに順位を振る ---
+                    sessionRows.sort((a, b) => b.total_score - a.total_score);
+                    
+                    // 表示用の日付（最初の1人のデータから取得）
+                    const date = new Date(sessionRows[0].created_at).toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' });
+                    
+                    const cardHtml = createSessionCard(sessionRows, date, gId);
 
                     if (index < 5) {
                         const slide = document.createElement('div');
@@ -90,7 +99,7 @@
                         swiperWrapper.appendChild(slide);
                     }
                     const listItem = document.createElement('div');
-                    listItem.className = 'list-item-card p-4 rounded-r-lg';
+                    listItem.className = 'list-item-card p-4 rounded-r-lg mb-6'; // 余白追加
                     listItem.innerHTML = cardHtml;
                     historyList.appendChild(listItem);
                 });
@@ -105,10 +114,10 @@
             } catch (e) { console.error(e); }
         }
 
-        function createSessionCard(players, date) {
-            const sId = players[0].session_id || date;
+        // 引数に sessionId (game_id) を追加
+        function createSessionCard(players, date, sessionId) {
             return `
-                <div class="game-card p-5" onclick="showSessionDetail('${sId}', '${date}')">
+                <div class="game-card p-5" onclick="showSessionDetail('${sessionId}', '${date}')">
                     <div class="flex justify-between items-start mb-5">
                         <div>
                             <span class="text-[9px] text-orange-500 font-black tracking-widest uppercase">Daily Result</span>
@@ -116,22 +125,26 @@
                         </div>
                     </div>
                     <div class="space-y-2">
-                        ${players.map(p => `
+                        ${players.map((p, i) => {
+                            const rank = i + 1; // 0位を排除し、1,2,3,4位を割り振る
+                            return `
                             <div class="flex items-center justify-between border-b border-white/5 pb-1">
                                 <div class="flex items-center space-x-3">
-                                    <span class="text-base font-black italic w-4 ${p.final_rank === 1 ? 'rank-gold' : 'text-slate-500'}">${p.final_rank}</span>
+                                    <span class="text-base font-black italic w-4 ${rank === 1 ? 'rank-gold' : 'text-slate-500'}">${rank}</span>
                                     <span class="text-xs font-bold text-slate-200">${p.player_name}</span>
                                 </div>
                                 <span class="text-sm score-font font-black ${p.total_score >= 0 ? 'text-blue-400' : 'text-red-400'}">
                                     ${p.total_score > 0 ? '+' : ''}${p.total_score}
                                 </span>
                             </div>
-                        `).join('')}
+                            `;
+                        }).join('')}
                     </div>
                 </div>`;
         }
 
-        window.showSessionDetail = async function(sId, date) {
+
+                window.showSessionDetail = async function(gId, date) {
             const modal = document.getElementById('detail-modal');
             const content = document.getElementById('modal-content');
             const dateLabel = document.getElementById('modal-date');
@@ -141,36 +154,32 @@
             modal.classList.add('active');
 
             try {
-                // その日の0:00〜23:59を取得してフィルタリング
-                const dayStart = new Date(date).setHours(0,0,0,0);
-                const dayEnd = new Date(date).setHours(23,59,59,999);
-                
+                // game_id を使って直接取得（日付フィルタより確実です）
                 const { data: matches, error } = await sb.from('game_results')
                     .select('*')
-                    .gte('created_at', new Date(dayStart).toISOString())
-                    .lte('created_at', new Date(dayEnd).toISOString())
+                    .eq('game_id', gId)
                     .order('created_at', { ascending: true });
 
                 if (error) throw error;
 
-                // match_id（またはcreated_at）でグループ化して1試合ずつの塊を作る
+                // 半荘ごとにグループ化（created_atの秒まで同じ4人を1セットとする）
                 const grouped = {};
                 matches.forEach(m => {
-                    const id = m.match_id || m.created_at; 
-                    if(!grouped[id]) grouped[id] = [];
-                    grouped[id].push(m);
+                    const timeKey = new Date(m.created_at).getTime(); 
+                    if(!grouped[timeKey]) grouped[timeKey] = [];
+                    grouped[timeKey].push(m);
                 });
 
                 content.innerHTML = "";
-                const matchKeys = Object.keys(grouped);
+                const matchTimes = Object.keys(grouped).sort();
                 
-                if (matchKeys.length === 0) {
-                    content.innerHTML = "<div class='text-center text-slate-500'>No match data found.</div>";
+                if (matchTimes.length === 0) {
+                    content.innerHTML = "<div class='text-center text-slate-500 py-20'>No match data found.</div>";
                     return;
                 }
 
-                matchKeys.forEach((mId, i) => {
-                    const players = grouped[mId].sort((a,b) => a.rank - b.rank);
+                matchTimes.forEach((time, i) => {
+                    const players = grouped[time].sort((a,b) => a.rank - b.rank);
                     const matchCard = `
                         <div class="bg-white/5 rounded-lg overflow-hidden border border-white/10 mb-6">
                             <div class="bg-white/10 px-4 py-2 flex justify-between items-center">
@@ -198,12 +207,12 @@
                         </div>`;
                     content.innerHTML += matchCard;
                 });
-
             } catch (e) { 
                 console.error(e);
                 content.innerHTML = "<div class='p-10 text-red-500 text-center'>ERROR LOADING DATA</div>"; 
             }
         }
+
 
         window.closeModal = function() {
             document.getElementById('detail-modal').classList.remove('active');

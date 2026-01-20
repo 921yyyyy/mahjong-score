@@ -160,19 +160,13 @@
     modal.classList.add('active');
 
     try {
-        // 1. そのセッションの最終集計（チップ・コイン）を取得
-        const { data: summary, error: sError } = await sb.from('set_summaries')
-            .select('*').eq('game_id', gId);
-        
-        // 2. そのセッションの各半荘スコアを取得
-        const { data: matches, error: mError } = await sb.from('game_results')
-            .select('*').eq('game_id', gId).order('created_at', { ascending: true });
+        const { data: summary, error: sError } = await sb.from('set_summaries').select('*').eq('game_id', gId);
+        const { data: matches, error: mError } = await sb.from('game_results').select('*').eq('game_id', gId).order('created_at', { ascending: true });
 
         if (sError || mError) throw (sError || mError);
-
         content.innerHTML = "";
 
-        // --- SECTION 1: SESSION PAYOUT (精算サマリー) ---
+        // --- SECTION 1: SESSION PAYOUT (競技・精算サマリー) ---
         const summarySorted = summary.sort((a, b) => b.total_score - a.total_score);
         let summaryHtml = `
             <section class="mb-10">
@@ -183,17 +177,15 @@
                             <tr class="bg-white/10 text-[9px] text-slate-400 uppercase">
                                 <th class="p-3">Player</th>
                                 <th class="p-3 text-right">Pts</th>
-                                <th class="p-3 text-right">Tip</th>
-                                <th class="p-3 text-right text-orange-400">Coin</th>
+                                <th class="p-3 text-right text-slate-300">Chips</th> <th class="p-3 text-right text-orange-400 font-black">Coin</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${summarySorted.map(s => `
-                                <tr class="border-b border-white/5">
-                                    <td class="p-3 font-bold text-white">${s.player_name}</td>
+                                <tr class="border-b border-white/5 last:border-0">
+                                    <td class="p-3 font-bold text-white uppercase tracking-tighter">${s.player_name}</td>
                                     <td class="p-3 text-right font-mono ${s.total_score >= 0 ? 'text-blue-400' : 'text-red-400'}">${s.total_score > 0 ? '+' : ''}${s.total_score}</td>
-                                    <td class="p-3 text-right font-mono text-slate-300">${s.tips > 0 ? '+' : ''}${s.tips}</td>
-                                    <td class="p-3 text-right font-mono font-black text-orange-500">${s.coins.toLocaleString()}</td>
+                                    <td class="p-3 text-right font-mono text-slate-300">${s.tips > 0 ? '+' : ''}${s.tips}</td> <td class="p-3 text-right font-mono font-black text-orange-500">¥${s.coins.toLocaleString()}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -202,7 +194,7 @@
             </section>`;
         content.innerHTML += summaryHtml;
 
-        // --- SECTION 2: MATCH LOGS (各半荘明細) ---
+        // --- SECTION 2: MATCH LOGS (半荘別スコア明細) ---
         const grouped = [];
         for (let i = 0; i < matches.length; i += 4) {
             grouped.push(matches.slice(i, i + 4));
@@ -214,15 +206,16 @@
             players.sort((a, b) => a.rank - b.rank);
             logsHtml += `
                 <div class="bg-white/5 rounded-lg overflow-hidden border border-white/10 mb-6">
-                    <div class="bg-white/10 px-4 py-2 flex justify-between items-center">
+                    <div class="bg-white/10 px-4 py-2 flex justify-between items-center border-b border-white/5">
                         <span class="text-[9px] font-black uppercase tracking-widest text-slate-400 italic">Match #${i+1}</span>
+                        <span class="text-[9px] text-slate-600 font-mono">${new Date(players[0].created_at).toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'})}</span>
                     </div>
                     <table class="w-full text-left border-collapse text-[11px]">
                         <tbody>
                             ${players.map(p => `
                                 <tr class="border-b border-white/5 last:border-0">
-                                    <td class="p-3 w-8 text-lg font-black italic ${p.rank==1?'text-yellow-400': 'text-slate-600'}">${p.rank}</td>
-                                    <td class="p-3 font-bold text-slate-200">${p.player_name}</td>
+                                    <td class="p-3 w-8 text-lg font-black italic ${p.rank==1?'text-yellow-400': (p.rank==4?'text-red-500':'text-slate-600')}">${p.rank}</td>
+                                    <td class="p-3 font-bold text-slate-200 uppercase">${p.player_name}</td>
                                     <td class="p-3 text-right font-mono font-bold ${p.score>=0?'text-blue-400':'text-red-400'}">
                                         ${p.score > 0 ? '+' : ''}${p.score}
                                     </td>
@@ -236,9 +229,10 @@
 
     } catch (e) { 
         console.error(e);
-        content.innerHTML = "<div class='p-10 text-red-500 text-center text-xs'>ERROR DATA SYNC</div>"; 
+        content.innerHTML = "<div class='p-10 text-red-500 text-center text-xs tracking-widest'>DATA ARCHIVE ERROR</div>"; 
     }
 }
+
 
 
 

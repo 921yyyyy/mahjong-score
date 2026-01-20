@@ -53,25 +53,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             const rowData = cell.getRow().getData();
             const el = cell.getElement();
 
-            // MLBスタイルのカラーリングロジック
+            // MLB.com Style: プレーンな背景に太字の数値
+            el.style.borderBottom = "1px solid #e2e8f0";
+            
             if (rowData.type === "score") {
-                el.style.fontWeight = "600";
-                if (val > 0) return `<span style="color:#60a5fa;">+${val}</span>`;
-                if (val < 0) return `<span style="color:#f87171;">${val}</span>`;
+                el.style.backgroundColor = "#ffffff";
+                if (val > 0) return `<span style="color:#005ac9; font-weight:700;">${val}</span>`;
+                if (val < 0) return `<span style="color:#a5091d; font-weight:700;">${val}</span>`;
+                return val === 0 ? `<span style="color:#94a3b8;">0</span>` : "";
             } else {
-                // DIFF, TIP, COIN行のMLB放送グラフィックスタイル
-                el.style.backgroundColor = rowData.type === "coin" ? "#1a202c" : "#2d3748";
-                el.style.borderTop = "1px solid #4a5568";
-                el.style.color = "#fff";
-                el.style.fontWeight = rowData.type === "coin" ? "900" : "700";
-                el.style.fontSize = rowData.type === "coin" ? "14px" : "12px";
-                
-                if (rowData.type === "coin") {
-                    return `<span style="color:#f6ad55;">${val}</span>`; // Coinはゴールド
-                }
-                return val > 0 ? `+${val}` : val;
+                // DIFF, TIP, COIN: MLB.comのフッター風（薄グレー）
+                el.style.backgroundColor = "#f7f9fc";
+                el.style.color = "#041e42";
+                el.style.fontWeight = rowData.type === "coin" ? "900" : "600";
+                if (rowData.type === "coin") el.style.color = "#005ac9";
+                return val;
             }
-            return val === 0 ? "0" : val;
         },
         cellDblClick: (e, cell) => {
             let val = cell.getValue();
@@ -93,29 +90,34 @@ document.addEventListener('DOMContentLoaded', async () => {
             {type: "coin", label: "COIN", a: 0, b: 0, c: 0, d: 0}
         ],
         layout: "fitColumns",
+        headerVisible: true,
         columns: [
             {
-                title: "NO", field: "label", width: 45, hozAlign: "center", headerSort: false,
+                title: "RK", field: "label", width: 50, hozAlign: "center", headerSort: false,
                 formatter: (cell) => {
                     const data = cell.getRow().getData();
                     const el = cell.getElement();
-                    if (data.type !== "score") {
-                        el.style.backgroundColor = "#1a202c";
-                        el.style.color = "#a0aec0";
-                        el.style.fontSize = "10px";
-                        return `<strong>${data.label}</strong>`;
-                    }
-                    return cell.getRow().getPosition();
+                    el.style.backgroundColor = "#f1f5f9";
+                    el.style.color = "#64748b";
+                    el.style.fontSize = "10px";
+                    el.style.fontWeight = "bold";
+                    return data.type === "score" ? cell.getRow().getPosition() : data.label;
                 }
             },
             createScoreColumn("A", "a"), createScoreColumn("B", "b"), createScoreColumn("C", "c"), createScoreColumn("D", "d"),
             {
-                title: "BAL", width: 45, hozAlign: "center", headerSort: false,
+                title: "BAL", width: 50, hozAlign: "center", headerSort: false,
                 formatter: (cell) => {
                     const d = cell.getData();
                     if(d.type !== "score") return "";
                     const sum = (Number(d.a)||0) + (Number(d.b)||0) + (Number(d.c)||0) + (Number(d.d)||0);
-                    return sum === 0 ? "✅" : `<span style="color:#f87171; font-size:10px;">${sum > 0 ? '+' : ''}${sum}</span>`;
+                    // ✅の代わりに数値と背景色で整合性を表現
+                    if (sum === 0) {
+                        return `<span style="font-weight:900; color:#041e42;">0</span>`;
+                    } else {
+                        cell.getElement().style.backgroundColor = "#fff1f2"; // 不整合時は薄い赤背景
+                        return `<span style="color:#e11d48; font-weight:bold; font-size:10px;">${sum > 0 ? '+' : ''}${sum}</span>`;
+                    }
                 },
                 cellClick: (e, cell) => {
                     const row = cell.getRow();
@@ -147,12 +149,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         const btn = document.getElementById('submit-btn');
         btn.disabled = !(hasNames && allRowsOk);
-        document.getElementById('status-badge').innerText = btn.disabled ? "CHECKING INTEGRITY..." : "READY TO SYNC";
+        document.getElementById('status-badge').innerText = btn.disabled ? "ANALYZING..." : "SYNC READY";
     }
 
     document.getElementById('submit-btn').onclick = async () => {
         const btn = document.getElementById('submit-btn');
-        btn.disabled = true; btn.innerText = "UPLOADING TO STATCAST...";
+        btn.disabled = true; btn.innerText = "UPLOADING TO STATS...";
         try {
             const names = Object.values(playerSelects).map(s => s.getValue());
             for(const name of names) await sb.from('players').upsert({ name: name }, { onConflict: 'name' });
@@ -182,13 +184,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
 
             await sb.from('game_results').insert(allResults);
-            const fSorted = scoreTotals.map((s, i) => ({s, i})).sort((a,b) => b.s - a.s);
-            const fRanks = new Array(4);
-            fSorted.forEach((item, rIdx) => fRanks[item.i] = rIdx + 1);
-
             const summaryRecords = names.map((name, i) => ({
                 game_id: gameRecord.id, player_id: playerMaster.find(m => m.name === name).id,
-                player_name: name, total_score: scoreTotals[i], final_rank: fRanks[i], tips: tips[i], coins: coins[i]
+                player_name: name, total_score: scoreTotals[i], final_rank: 0, tips: tips[i], coins: coins[i]
             }));
             await sb.from('set_summaries').insert(summaryRecords);
             alert("RECORD FINALIZED");

@@ -8,39 +8,18 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <style>
         body { background-color: #070d1c; color: white; font-family: 'Inter', sans-serif; overflow-x: hidden; }
-        
-        /* MLBスコアボード風：高級感のあるグラデーションカード */
-        .game-card {
-            background: linear-gradient(180deg, #161e2d 0%, #0a0f1a 100%);
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7);
-            transition: transform 0.2s ease;
-        }
-
-        /* Swiper Coverflow 調整 */
+        .game-card { background: linear-gradient(180deg, #161e2d 0%, #0a0f1a 100%); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7); }
         .swiper { width: 100%; padding-top: 30px; padding-bottom: 50px; }
-        .swiper-slide {
-            background-position: center; background-size: cover;
-            width: 320px; /* カードの幅 */
-            opacity: 0.3;
-            transition: opacity 0.4s ease;
-        }
+        .swiper-slide { width: 320px; opacity: 0.3; transition: opacity 0.4s ease; }
         .swiper-slide-active { opacity: 1; }
-
-        /* スコアのタイポグラフィ */
         .score-font { font-family: 'Roboto Mono', monospace; }
-        
-        /* 順位の色分け */
-        .rank-gold { color: #facc15; text-shadow: 0 0 10px rgba(250, 204, 21, 0.4); }
+        .rank-gold { color: #facc15; }
         .rank-silver { color: #cbd5e1; }
-        .rank-normal { color: #64748b; }
+        .list-item-card { background: rgba(255, 255, 255, 0.03); border-left: 3px solid #f97316; }
 
-        /* 下部リスト用 */
-        .list-item-card {
-            background: rgba(255, 255, 255, 0.03);
-            border-left: 3px solid #f97316;
-        }
+        /* モーダルアニメーション */
+        #detail-modal { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(100%); }
+        #detail-modal.active { transform: translateY(0); }
     </style>
 </head>
 <body class="pb-24">
@@ -51,19 +30,29 @@
         </header>
 
         <section class="mb-12">
-            <h2 class="text-[10px] font-bold text-slate-500 mb-4 uppercase tracking-[0.2em] px-2">Featured Sessions</h2>
             <div class="swiper mySwiper">
-                <div class="swiper-wrapper" id="history-swiper-wrapper">
-                    </div>
+                <div class="swiper-wrapper" id="history-swiper-wrapper"></div>
                 <div class="swiper-pagination"></div>
             </div>
         </section>
 
         <section>
             <h2 class="text-[10px] font-bold text-slate-500 mb-6 uppercase tracking-[0.2em] px-2 border-l-2 border-orange-500 ml-2">All Logs</h2>
-            <div id="history-list" class="space-y-6 px-2">
-                </div>
+            <div id="history-list" class="space-y-6 px-2"></div>
         </section>
+    </div>
+
+    <div id="detail-modal" class="fixed inset-0 z-50 bg-[#070d1c] overflow-y-auto">
+        <div class="sticky top-0 bg-[#070d1c]/90 backdrop-blur-md p-4 border-b border-white/10 flex justify-between items-center">
+            <div>
+                <span id="modal-date" class="text-[10px] text-orange-500 font-bold uppercase">DATE</span>
+                <h2 class="text-xl font-black italic uppercase tracking-tighter">Box Score</h2>
+            </div>
+            <button onclick="closeModal()" class="text-slate-400 hover:text-white bg-white/5 w-10 h-10 rounded-full flex items-center justify-center font-bold">×</button>
+        </div>
+        
+        <div id="modal-content" class="p-4 space-y-8">
+            </div>
     </div>
 
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
@@ -77,111 +66,148 @@
 
         async function initHistory() {
             try {
-                // 1. Sessionデータを取得
-                const { data: sessionData, error } = await sb
-                    .from('set_summaries')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-
+                const { data: sessionData, error } = await sb.from('set_summaries').select('*').order('created_at', { ascending: false });
                 if (error) throw error;
 
-                // 2. 日付ごとにグループ化
                 const sessions = {};
                 sessionData.forEach(row => {
-                    // 日本時間の日付をキーにする
-                    const dateObj = new Date(row.created_at);
-                    const dateKey = dateObj.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
-                    if (!sessions[dateKey]) sessions[dateKey] = [];
-                    sessions[dateKey].push(row);
+                    const d = new Date(row.created_at).toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' });
+                    if (!sessions[d]) sessions[d] = [];
+                    sessions[d].push(row);
                 });
 
                 const swiperWrapper = document.getElementById('history-swiper-wrapper');
                 const historyList = document.getElementById('history-list');
 
                 Object.keys(sessions).forEach((date, index) => {
-                    const players = sessions[date].sort((a, b) => a.final_rank - b.final_rank);
+                    const players = sessions[date].sort((a,b) => a.final_rank - b.final_rank);
                     const cardHtml = createSessionCard(players, date);
 
-                    // 直近5件をSwiperへ
                     if (index < 5) {
                         const slide = document.createElement('div');
                         slide.className = 'swiper-slide';
                         slide.innerHTML = cardHtml;
                         swiperWrapper.appendChild(slide);
                     }
-                    
-                    // すべてをリストへ
                     const listItem = document.createElement('div');
                     listItem.className = 'list-item-card p-4 rounded-r-lg';
                     listItem.innerHTML = cardHtml;
                     historyList.appendChild(listItem);
                 });
 
-                // 3. Swiper Coverflow 初期化
                 new Swiper(".mySwiper", {
                     effect: "coverflow",
-                    grabCursor: true,
                     centeredSlides: true,
                     slidesPerView: "auto",
-                    coverflowEffect: {
-                        rotate: 35,
-                        stretch: 0,
-                        depth: 100,
-                        modifier: 1,
-                        slideShadows: false,
-                    },
+                    coverflowEffect: { rotate: 35, stretch: 0, depth: 100, modifier: 1, slideShadows: false },
                     pagination: { el: ".swiper-pagination", clickable: true },
                 });
-
-            } catch (e) {
-                console.error("Initialization Error:", e);
-            }
+            } catch (e) { console.error(e); }
         }
 
         function createSessionCard(players, date) {
-            const winner = players[0];
-            const sessionId = players[0].session_id || date;
-
+            const sId = players[0].session_id || date;
             return `
-                <div class="game-card p-5" onclick="showSessionDetail('${sessionId}', '${date}')">
+                <div class="game-card p-5" onclick="showSessionDetail('${sId}', '${date}')">
                     <div class="flex justify-between items-start mb-5">
                         <div>
                             <span class="text-[9px] text-orange-500 font-black tracking-widest uppercase">Daily Result</span>
                             <h3 class="text-xl font-black italic tracking-tighter leading-none">${date}</h3>
                         </div>
-                        <div class="bg-orange-600 text-white text-[8px] px-2 py-0.5 font-bold uppercase rounded-sm">Finalized</div>
                     </div>
-                    
                     <div class="space-y-2">
                         ${players.map(p => `
-                            <div class="flex items-center justify-between border-b border-white/5 pb-1 last:border-0">
+                            <div class="flex items-center justify-between border-b border-white/5 pb-1">
                                 <div class="flex items-center space-x-3">
-                                    <span class="text-base font-black italic w-4 ${p.final_rank === 1 ? 'rank-gold' : (p.final_rank === 2 ? 'rank-silver' : 'rank-normal')}">${p.final_rank}</span>
-                                    <span class="text-xs font-bold tracking-tight text-slate-200">${p.player_name}</span>
+                                    <span class="text-base font-black italic w-4 ${p.final_rank === 1 ? 'rank-gold' : 'text-slate-500'}">${p.final_rank}</span>
+                                    <span class="text-xs font-bold text-slate-200">${p.player_name}</span>
                                 </div>
-                                <div class="text-right">
-                                    <span class="text-sm score-font font-black ${p.total_score >= 0 ? 'text-blue-400' : 'text-red-400'}">
-                                        ${p.total_score > 0 ? '+' : ''}${p.total_score}
-                                    </span>
-                                </div>
+                                <span class="text-sm score-font font-black ${p.total_score >= 0 ? 'text-blue-400' : 'text-red-400'}">
+                                    ${p.total_score > 0 ? '+' : ''}${p.total_score}
+                                </span>
                             </div>
                         `).join('')}
                     </div>
-                    
-                    <div class="mt-5 flex justify-between items-center opacity-50">
-                        <span class="text-[8px] font-bold uppercase tracking-widest">Tap for box score</span>
-                        <div class="w-10 h-[1px] bg-slate-700"></div>
-                    </div>
-                </div>
-            `;
+                </div>`;
         }
 
-        // 試合詳細表示（Matchデータ連携用）
-        window.showSessionDetail = function(sessionId, date) {
-            console.log("Details for:", sessionId);
-            // ここにMatch詳細モーダルの呼び出しを実装予定
-            alert(`${date} の全対局データ（Match）を表示します。モーダルを構築しましょう！`);
-        };
+        window.showSessionDetail = async function(sId, date) {
+            const modal = document.getElementById('detail-modal');
+            const content = document.getElementById('modal-content');
+            const dateLabel = document.getElementById('modal-date');
+            
+            dateLabel.innerText = date;
+            content.innerHTML = "<div class='p-10 text-center animate-pulse'>LOADING MATCH DATA...</div>";
+            modal.classList.add('active');
+
+            try {
+                // その日の0:00〜23:59を取得してフィルタリング
+                const dayStart = new Date(date).setHours(0,0,0,0);
+                const dayEnd = new Date(date).setHours(23,59,59,999);
+                
+                const { data: matches, error } = await sb.from('game_results')
+                    .select('*')
+                    .gte('created_at', new Date(dayStart).toISOString())
+                    .lte('created_at', new Date(dayEnd).toISOString())
+                    .order('created_at', { ascending: true });
+
+                if (error) throw error;
+
+                // match_id（またはcreated_at）でグループ化して1試合ずつの塊を作る
+                const grouped = {};
+                matches.forEach(m => {
+                    const id = m.match_id || m.created_at; 
+                    if(!grouped[id]) grouped[id] = [];
+                    grouped[id].push(m);
+                });
+
+                content.innerHTML = "";
+                const matchKeys = Object.keys(grouped);
+                
+                if (matchKeys.length === 0) {
+                    content.innerHTML = "<div class='text-center text-slate-500'>No match data found.</div>";
+                    return;
+                }
+
+                matchKeys.forEach((mId, i) => {
+                    const players = grouped[mId].sort((a,b) => a.rank - b.rank);
+                    const matchCard = `
+                        <div class="bg-white/5 rounded-lg overflow-hidden border border-white/10 mb-6">
+                            <div class="bg-white/10 px-4 py-2 flex justify-between items-center">
+                                <span class="text-[10px] font-black uppercase tracking-widest text-orange-400">Match #${i+1}</span>
+                                <span class="text-[9px] text-slate-500 font-mono">${new Date(players[0].created_at).toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'})}</span>
+                            </div>
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="text-[8px] text-slate-500 uppercase border-b border-white/5">
+                                        <th class="p-3 w-16">Rank</th>
+                                        <th class="p-3">Player</th>
+                                        <th class="p-3 text-right">Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${players.map(p => `
+                                        <tr class="border-b border-white/5 last:border-0">
+                                            <td class="p-3 text-lg font-black italic ${p.rank==1?'rank-gold': (p.rank==4?'text-red-500':'text-slate-400')}">${p.rank}</td>
+                                            <td class="p-3 text-xs font-bold text-slate-200">${p.player_name}</td>
+                                            <td class="p-3 text-right font-mono font-bold ${p.score>=0?'text-blue-400':'text-red-400'}">${p.score>0?'+':''}${p.score}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>`;
+                    content.innerHTML += matchCard;
+                });
+
+            } catch (e) { 
+                console.error(e);
+                content.innerHTML = "<div class='p-10 text-red-500 text-center'>ERROR LOADING DATA</div>"; 
+            }
+        }
+
+        window.closeModal = function() {
+            document.getElementById('detail-modal').classList.remove('active');
+        }
 
         initHistory();
     </script>

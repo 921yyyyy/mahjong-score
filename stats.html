@@ -66,19 +66,33 @@
         
         <div class="p-4 space-y-6">
             <div class="grid grid-cols-3 gap-2">
-                <div class="bg-white/5 p-3 rounded border border-white/5 text-center">
-                    <span class="text-[8px] text-slate-500 block uppercase">Match Avg</span>
-                    <span id="stat-match-avg" class="text-lg font-black italic text-white">-</span>
-                </div>
-                <div class="bg-white/5 p-3 rounded border border-white/5 text-center">
-                    <span class="text-[8px] text-slate-500 block uppercase">Sess Avg</span>
-                    <span id="stat-sess-avg" class="text-lg font-black italic text-white">-</span>
-                </div>
-                <div class="bg-white/5 p-3 rounded border border-white/5 text-center">
-                    <span class="text-[8px] text-slate-500 block uppercase">Chips/G</span>
-                    <span id="stat-chips-avg" class="text-lg font-black italic text-orange-500">-</span>
-                </div>
-            </div>
+    <div class="bg-white/5 p-2 rounded border border-white/5 text-center">
+        <span class="text-[7px] text-slate-500 block uppercase leading-tight">Match Avg Rank</span>
+        <span id="stat-match-avg" class="text-base font-black italic text-white">-</span>
+    </div>
+    <div class="bg-white/5 p-2 rounded border border-white/5 text-center">
+        <span class="text-[7px] text-slate-500 block uppercase leading-tight">Match PTS Avg</span>
+        <span id="stat-match-pts-avg" class="text-base font-black italic text-blue-400">-</span>
+    </div>
+    <div class="bg-white/5 p-2 rounded border border-white/5 text-center">
+        <span class="text-[7px] text-slate-500 block uppercase leading-tight">Total Chips</span>
+        <span id="stat-total-chips" class="text-base font-black italic text-yellow-500">-</span>
+    </div>
+
+    <div class="bg-white/5 p-2 rounded border border-white/5 text-center">
+        <span class="text-[7px] text-slate-500 block uppercase leading-tight">Sess Avg Rank</span>
+        <span id="stat-sess-avg" class="text-base font-black italic text-white">-</span>
+    </div>
+    <div class="bg-white/5 p-2 rounded border border-white/5 text-center">
+        <span class="text-[7px] text-slate-500 block uppercase leading-tight">Sess 1st Total</span>
+        <span id="stat-sess-win" class="text-base font-black italic text-orange-500">-</span>
+    </div>
+    <div class="bg-white/5 p-2 rounded border border-white/5 text-center">
+        <span class="text-[7px] text-slate-500 block uppercase leading-tight">Total Coins</span>
+        <span id="stat-total-coins" class="text-base font-black italic text-green-500">-</span>
+    </div>
+</div>
+
 
             <div class="space-y-6">
                 <div class="bg-white/5 p-4 rounded-xl border border-white/10">
@@ -197,36 +211,40 @@
     modal.classList.remove('hidden');
 
     try {
-        // 1. Matchデータ取得 (最新20件を取得)
-        const { data: mData } = await sb.from('game_results')
-            .select('rank, score')
-            .eq('player_name', playerName)
-            .order('created_at', { ascending: false }).limit(20);
+        // 全データの取得
+        const { data: allMatch } = await sb.from('game_results').select('rank, score').eq('player_name', playerName);
+        const { data: allSess } = await sb.from('set_summaries').select('total_score, final_rank, tips, coins').eq('player_name', playerName);
 
-        // 2. Sessionデータ取得 (最新10件を取得)
-        const { data: sData } = await sb.from('set_summaries')
-            .select('total_score, final_rank')
-            .eq('player_name', playerName)
-            .order('created_at', { ascending: false }).limit(10);
-
-        // --- Matchグラフ描画 (最新順を反転させて過去→最新にする) ---
-        if (mData && mData.length > 0) {
-            const revM = mData.slice(); 
-            renderAdvancedChart('matchChart', revM.map(d=>d.rank), revM.map(d=>d.score), '#3b82f6', 'match');
-            const avg = (revM.reduce((a, b) => a + b.rank, 0) / revM.length).toFixed(2);
-            document.getElementById('stat-match-avg').innerText = avg;
+        // --- 1行目用の計算 ---
+        if (allMatch && allMatch.length > 0) {
+            const mAvg = (allMatch.reduce((a, b) => a + b.rank, 0) / allMatch.length).toFixed(2);
+            const mPtsAvg = (allMatch.reduce((a, b) => a + b.score, 0) / allMatch.length).toFixed(1);
+            document.getElementById('stat-match-avg').innerText = mAvg;
+            document.getElementById('stat-match-pts-avg').innerText = (mPtsAvg > 0 ? '+' : '') + mPtsAvg;
         }
 
-        // --- Sessionグラフ描画 (最新順を反転させて過去→最新にする) ---
-        if (sData && sData.length > 0) {
-            const revS = sData.slice(); 
-            renderAdvancedChart('sessChart', revS.map(d=>d.final_rank), revS.map(d=>d.total_score), '#f97316', 'sess');
-            const sAvg = (revS.reduce((a, b) => a + (b.final_rank||0), 0) / revS.length).toFixed(2);
+        // --- 2行目用の計算 ---
+        if (allSess && allSess.length > 0) {
+            const sAvg = (allSess.reduce((a, b) => a + (b.final_rank || 0), 0) / allSess.length).toFixed(2);
+            const sWins = allSess.filter(s => s.final_rank === 1).length;
+            const tChips = allSess.reduce((a, b) => a + (b.tips || 0), 0);
+            const tCoins = allSess.reduce((a, b) => a + (b.coins || 0), 0);
+
             document.getElementById('stat-sess-avg').innerText = sAvg;
+            document.getElementById('stat-sess-win').innerText = sWins; // 「回」は入れず数字のみでスッキリ
+            document.getElementById('stat-total-chips').innerText = tChips;
+            document.getElementById('stat-total-coins').innerText = tCoins.toLocaleString();
         }
-    } catch (e) { 
-        console.error("Detail Error:", e); 
-    }
+
+        // グラフ描画（時系列：左が過去、右が最新）
+        // ※最新20件を取得して表示
+        const recentMatch = allMatch ? allMatch.slice(-20) : [];
+        const recentSess = allSess ? allSess.slice(-10) : [];
+        
+        renderAdvancedChart('matchChart', recentMatch.map(d=>d.rank), recentMatch.map(d=>d.score), '#3b82f6', 'match');
+        renderAdvancedChart('sessChart', recentSess.map(d=>d.final_rank), recentSess.map(d=>d.total_score), '#f97316', 'sess');
+
+    } catch (e) { console.error(e); }
 };
 
 

@@ -100,12 +100,36 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    window.runCalc = (btn, isTip = false) => {
-        const row = btn.closest('tr');
-        const vals = ['a', 'b', 'c'].map(c => Number(row.querySelector(`[data-col="${c}"]`).value) || 0);
-        row.querySelector('[data-col="d"]').value = -(vals.reduce((s, v) => s + v, 0));
-        updateCalcs(); validateAll();
-    };
+    window.runCalc = (btn) => {
+    const row = btn.closest('tr');
+    const inputs = Array.from(row.querySelectorAll('.score-input'));
+    
+    // 1. 完全に未入力（空文字）のセルだけを抽出
+    const emptyInputs = inputs.filter(i => i.value === "");
+
+    // 未入力が1つもない場合は、何もせず終了（または最後の列を調整対象にする）
+    if (emptyInputs.length === 0) return;
+
+    // 2. 未入力が複数ある場合は、その中の「最初の1つ」をターゲットにする
+    // (例: A, Bのみ入力してCALCを押すと、Cが計算され、Dは空のまま残る)
+    const target = emptyInputs[0];
+    const targetCol = target.getAttribute('data-col');
+    
+    // 3. ターゲット以外の「入力済み」の数値だけを合計
+    let otherSum = 0;
+    inputs.forEach(i => {
+        if (i.getAttribute('data-col') !== targetCol) {
+            otherSum += Number(i.value) || 0;
+        }
+    });
+
+    // 4. 合計を0にするための数値を流し込む
+    target.value = -otherSum;
+
+    updateCalcs(); 
+    validateAll();
+};
+
 
     function validateAll() {
         const matchRows = Array.from(document.querySelectorAll('.match-row'));

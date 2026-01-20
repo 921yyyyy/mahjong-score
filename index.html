@@ -3,96 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>STATS ENTRY | MLB OFFICIAL</title>
+    <title>STATS ENTRY | MLB PRO</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
     <style>
-        body { background-color: #070d1c; color: #f1f5f9; font-family: 'Inter', sans-serif; }
-        /* stats.htmlのデザインを完全継承 */
-        .mlb-table-container { background-color: #ffffff; overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; min-width: 400px; table-layout: fixed; }
+        body { background-color: #070d1c; color: white; font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
         
-        /* ヘッダー: MLB.com Stats 準拠 */
-        th { 
-            background-color: #041e42 !important; color: #ffffff !important;
-            text-transform: uppercase; font-size: 9px !important;
-            padding: 12px 5px !important; text-align: center !important;
-            border-right: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        /* セル: stats.html(11px)準拠 */
-        td { 
-            background-color: #ffffff; color: #1e293b;
-            font-weight: 800; font-size: 11px;
-            border-bottom: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;
-            padding: 0 !important; height: 44px; text-align: center;
-        }
-        tr:nth-child(odd) td { background-color: #f8fafc; }
-        
-        /* 入力エリア */
-        .cell-input {
-            width: 100%; height: 100%; border: none; background: transparent;
-            text-align: center; font-weight: 800; font-size: 14px; color: #1e293b;
-            outline: none; transition: all 0.2s;
-        }
-        .cell-input:focus { background-color: #fff7ed; box-shadow: inset 0 0 0 2px #f97316; }
-        
-        /* ラベル列 (NO) */
-        .col-no { background-color: #041e42 !important; color: white !important; font-size: 9px !important; width: 45px; }
-        .row-special td { background-color: #f1f5f9 !important; font-weight: 900; }
-        
-        /* カラー設定 */
+        /* MLB Table Layout - スマホでも絶対に崩れない固定設定 */
+        .mlb-table { width: 100%; table-layout: fixed; border-collapse: collapse; background: white; border-radius: 4px; overflow: hidden; }
+        .mlb-table th { background: #041e42; color: white; font-size: 9px; text-transform: uppercase; padding: 12px 2px; border-right: 1px solid rgba(255,255,255,0.1); }
+        .mlb-table td { color: #1e293b; font-size: 11px; font-weight: 800; border-bottom: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; height: 44px; padding: 0; text-align: center; }
+        .mlb-table tr:nth-child(even) td { background: #f8fafc; }
+
+        /* 入力エリアの美学 */
+        .score-input { width: 100%; height: 100%; border: none; background: transparent; text-align: center; font-weight: 900; font-size: 14px; color: #1e293b; outline: none; }
+        .score-input:focus { background: #fff7ed; box-shadow: inset 0 0 0 2px #f97316; }
+
+        /* 特殊行（TOTAL, DIFF, COIN） */
+        .row-spec { background: #f1f5f9 !important; }
+        .row-spec td { color: #041e42; }
+        .col-label { background: #f1f5f9 !important; font-size: 9px !important; color: #64748b !important; width: 45px; }
+
+        /* 文字色設定 (stats.html準拠) */
         .pts-positive { color: #1d4ed8 !important; }
         .pts-negative { color: #be123c !important; }
-        
+
         /* CALCボタン */
         .btn-calc { background: #041e42; color: white; font-size: 8px; padding: 4px 8px; border-radius: 2px; font-weight: 900; }
         
-        /* TomSelect調整 */
-        .ts-control { background: #161e2d !important; color: white !important; border: 1px solid #334155 !important; border-radius: 4px !important; font-weight: 700; }
+        /* Tom Select MLB Style */
+        .ts-control { background: #161e2d !important; color: white !important; border: 1px solid #334155 !important; font-weight: 700; border-radius: 8px !important; }
         .ts-control input { color: white !important; }
     </style>
 </head>
 <body class="pb-32 px-4">
     <div class="max-w-md mx-auto space-y-6">
-        <header class="py-6">
-            <h1 class="text-2xl font-black italic uppercase tracking-tighter text-white leading-none">Analysis Center <span class="text-orange-500">Entry</span></h1>
+        <header class="py-8">
+            <h1 class="text-3xl font-black italic uppercase tracking-tighter border-l-4 border-orange-500 pl-3 leading-none">
+                Data <span class="text-orange-500">Entry</span>
+            </h1>
         </header>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-2 gap-3 mb-6">
             <select id="pA" class="roster-select"></select><select id="pB" class="roster-select"></select>
             <select id="pC" class="roster-select"></select><select id="pD" class="roster-select"></select>
         </div>
 
-        <div class="mlb-table-container shadow-2xl rounded-sm">
-            <table id="entry-table">
+        <div class="shadow-2xl">
+            <table class="mlb-table">
                 <thead>
                     <tr>
                         <th style="width: 45px;">NO</th>
                         <th>A</th><th>B</th><th>C</th><th>D</th>
-                        <th style="width: 50px;">BAL</th>
+                        <th style="width: 55px;">BAL</th>
                     </tr>
                 </thead>
-                <tbody id="table-body">
+                <tbody id="match-body">
                     </tbody>
                 <tfoot>
-                    <tr class="row-special" id="row-total">
-                        <td class="col-no">TOT</td><td id="tot-a">0</td><td id="tot-b">0</td><td id="tot-c">0</td><td id="tot-d">0</td><td></td>
-                    </tr>
-                    <tr class="row-special" id="row-diff">
-                        <td class="col-no">DIF</td><td id="dif-a">0</td><td id="dif-b">0</td><td id="dif-c">0</td><td id="dif-d">0</td><td></td>
-                    </tr>
-                    <tr class="row-special" id="row-tip">
-                        <td class="col-no">TIP</td>
-                        <td><input type="number" class="cell-input tip-input" data-col="a"></td>
-                        <td><input type="number" class="cell-input tip-input" data-col="b"></td>
-                        <td><input type="number" class="cell-input tip-input" data-col="c"></td>
-                        <td><input type="number" class="cell-input tip-input" data-col="d"></td>
+                    <tr class="row-spec">
+                        <td class="col-label">TOT</td>
+                        <td id="tot-a">0</td><td id="tot-b">0</td><td id="tot-c">0</td><td id="tot-d">0</td>
                         <td></td>
                     </tr>
-                    <tr class="row-special" style="border-top: 2px solid #041e42;" id="row-coin">
-                        <td class="col-no">COIN</td>
+                    <tr class="row-spec">
+                        <td class="col-label">DIF</td>
+                        <td id="dif-a">0</td><td id="dif-b">0</td><td id="dif-c">0</td><td id="dif-d">0</td>
+                        <td></td>
+                    </tr>
+                    <tr class="row-spec" style="border-top: 1px solid #cbd5e1;">
+                        <td class="col-label">TIP</td>
+                        <td><input type="number" class="score-input tip-in" data-col="a"></td>
+                        <td><input type="number" class="score-input tip-in" data-col="b"></td>
+                        <td><input type="number" class="score-input tip-in" data-col="c"></td>
+                        <td><input type="number" class="score-input tip-in" data-col="d"></td>
+                        <td></td>
+                    </tr>
+                    <tr class="row-spec" style="background: #eef2ff !important; border-top: 2px solid #041e42;">
+                        <td class="col-label" style="color:#041e42">COIN</td>
                         <td id="coin-a" style="color:#f97316">0</td>
                         <td id="coin-b" style="color:#f97316">0</td>
                         <td id="coin-c" style="color:#f97316">0</td>
@@ -101,13 +90,15 @@
                     </tr>
                 </tfoot>
             </table>
-            <div class="p-3 bg-[#f8fafc] border-t flex justify-between">
-                <button id="add-row" class="text-[10px] font-black text-[#041e42] uppercase tracking-widest">+ Add Match</button>
-                <div id="status-badge" class="text-[9px] font-bold text-slate-400 uppercase">Analyzing...</div>
+            <div class="p-3 bg-white/5 border-t border-white/10 flex justify-between">
+                <button id="add-row" class="text-[10px] font-black text-orange-500 uppercase tracking-widest">+ Add New Match</button>
+                <div id="status-badge" class="text-[9px] font-bold text-slate-500 uppercase">Analyzing...</div>
             </div>
         </div>
 
-        <button id="submit-btn" class="w-full py-4 bg-[#041e42] text-white font-black rounded active:scale-95 transition-all uppercase tracking-widest text-xs disabled:opacity-20">Finalize Stats</button>
+        <button id="submit-btn" class="w-full py-5 bg-[#041e42] hover:bg-orange-600 text-white font-black rounded-xl shadow-xl transition-all active:scale-[0.98] uppercase tracking-[0.2em] text-xs disabled:opacity-20" disabled>
+            Finalize Stats
+        </button>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

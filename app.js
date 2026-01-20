@@ -6,7 +6,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     let playerSelects = {};
     let rowCount = 0;
 
-    // 1. マスターデータ取得
     async function initRoster() {
         const { data: players } = await sb.from('players').select('name');
         const options = (players || []).map(p => ({ value: p.name, text: p.name }));
@@ -15,46 +14,85 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // 2. 行生成（ピュアHTML）
+    // 入力イベント（半角強制・色付け）
+    function setupInputEvents(input) {
+        input.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/[^-0-9.]/g, ''); // 半角数字強制
+            updateCalcs(); 
+            validateAll();
+        });
+        // ダブルタップでマイナス反転
+        input.addEventListener('dblclick', (e) => {
+            const val = Number(e.target.value);
+            if(val !== 0) {
+                e.target.value = val * -1;
+                updateCalcs();
+                validateAll();
+            }
+        });
+    }
+
     function addMatchRow() {
         rowCount++;
         const tr = document.createElement('tr');
         tr.className = 'match-row';
         tr.innerHTML = `
             <td class="col-label">${rowCount}</td>
-            <td><input type="number" class="score-input sc-in" data-col="a"></td>
-            <td><input type="number" class="score-input sc-in" data-col="b"></td>
-            <td><input type="number" class="score-input sc-in" data-col="c"></td>
-            <td><input type="number" class="score-input sc-in" data-col="d"></td>
+            <td><input type="number" inputmode="decimal" class="score-input sc-in" data-col="a"></td>
+            <td><input type="number" inputmode="decimal" class="score-input sc-in" data-col="b"></td>
+            <td><input type="number" inputmode="decimal" class="score-input sc-in" data-col="c"></td>
+            <td><input type="number" inputmode="decimal" class="score-input sc-in" data-col="d"></td>
             <td class="bal-cell"></td>
         `;
         document.getElementById('match-body').appendChild(tr);
-        tr.querySelectorAll('input').forEach(i => i.addEventListener('input', () => { updateCalcs(); validateAll(); }));
+        tr.querySelectorAll('input').forEach(setupInputEvents);
     }
 
-    // 3. 計算ロジック
     function updateCalcs() {
         const totals = { a: 0, b: 0, c: 0, d: 0 };
         const tips = { a: 0, b: 0, c: 0, d: 0 };
 
+        // スコア計算
         document.querySelectorAll('.match-row').forEach(row => {
             let rowSum = 0;
+            let hasInput = false;
             ['a', 'b', 'c', 'd'].forEach(col => {
-                const val = Number(row.querySelector(`[data-col="${col}"]`).value) || 0;
+                const raw = row.querySelector(`[data-col="${col}"]`).value;
+                if(raw !== "") hasInput = true;
+                const val = Number(raw) || 0;
                 totals[col] += val;
                 rowSum += val;
-                
                 const input = row.querySelector(`[data-col="${col}"]`);
                 input.classList.toggle('pts-positive', val > 0);
                 input.classList.toggle('pts-negative', val < 0);
             });
             const balCell = row.querySelector('.bal-cell');
-            balCell.innerHTML = rowSum === 0 ? '<span style="color:#22c55e;">OK</span>' : `<button class="btn-calc" onclick="runCalc(this)">CALC</button>`;
+            if(!hasInput) { balCell.innerHTML = ""; }
+            else {
+                balCell.innerHTML = rowSum === 0 ? '<span style="color:#22c55e;">OK</span>' : `<button class="btn-calc" onclick="runCalc(this)">CALC</button>`;
+            }
         });
 
+        // チップ計算
+        let tipSum = 0;
+        let tipHasInput = false;
         ['a', 'b', 'c', 'd'].forEach(col => {
-            const tVal = Number(document.querySelector(`.tip-in[data-col="${col}"]`).value) || 0;
-            tips[col] = tVal;
+            const raw = document.querySelector(`.tip-in[data-col="${col}"]`).value;
+            if(raw !== "") tipHasInput = true;
+            const val = Number(raw) || 0;
+            tips[col] = val;
+            tipSum += val;
+            const input = document.querySelector(`.tip-in[data-col="${col}"]`);
+            input.classList.toggle('pts-positive', val > 0);
+            input.classList.toggle('pts-negative', val < 0);
+        });
+        const tipBalCell = document.getElementById('tip-bal-cell');
+        if(!tipHasInput) { tipBalCell.innerHTML = ""; }
+        else {
+            tipBalCell.innerHTML = tipSum === 0 ? '<span style="color:#22c55e;">OK</span>' : `<button class="btn-calc" onclick="runCalc(this, true)">CALC</button>`;
+        }
+
+        ['a', 'b', 'c', 'd'].forEach(col => {
             const max = Math.max(...Object.values(totals));
             document.getElementById(`tot-${col}`).innerText = totals[col];
             document.getElementById(`dif-${col}`).innerText = totals[col] - max;
@@ -62,7 +100,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    window.runCalc = (btn) => {
+    window.runCalc = (btn, isTip = false) => {
         const row = btn.closest('tr');
         const vals = ['a', 'b', 'c'].map(c => Number(row.querySelector(`[data-col="${c}"]`).value) || 0);
         row.querySelector('[data-col="d"]').value = -(vals.reduce((s, v) => s + v, 0));
@@ -70,42 +108,47 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     function validateAll() {
-        const rowsValid = Array.from(document.querySelectorAll('.match-row')).every(row => {
+        const matchRows = Array.from(document.querySelectorAll('.match-row'));
+        const activeRows = matchRows.filter(row => Array.from(row.querySelectorAll('.sc-in')).some(i => i.value !== ""));
+        
+        const rowsValid = activeRows.length > 0 && activeRows.every(row => {
             const vals = Array.from(row.querySelectorAll('.sc-in')).map(i => Number(i.value) || 0);
-            return vals.some(v => v !== 0) && vals.reduce((s, v) => s + v, 0) === 0;
+            return vals.reduce((s, v) => s + v, 0) === 0;
         });
+
+        const tipInputs = Array.from(document.querySelectorAll('.tip-in'));
+        const tipHasInput = tipInputs.some(i => i.value !== "");
+        const tipValid = !tipHasInput || tipInputs.map(i => Number(i.value) || 0).reduce((s, v) => s + v, 0) === 0;
+
         const playersSet = Object.values(playerSelects).every(s => s.getValue() !== "");
         const btn = document.getElementById('submit-btn');
-        btn.disabled = !(rowsValid && playersSet);
+        btn.disabled = !(rowsValid && tipValid && playersSet);
         document.getElementById('status-badge').innerText = btn.disabled ? "Checking Stats..." : "Ready to Sync";
     }
 
-    // 4. DB保存（DX重視）
     document.getElementById('submit-btn').onclick = async () => {
         const btn = document.getElementById('submit-btn');
         btn.disabled = true; btn.innerText = "SYNCING...";
-        
         try {
             const names = Object.values(playerSelects).map(s => s.getValue());
-            // プレイヤー名からIDを取得/登録
             for(const n of names) await sb.from('players').upsert({ name: n }, { onConflict: 'name' });
             const { data: mstr } = await sb.from('players').select('id, name').in('name', names);
-
-            // games登録 -> ID取得
             const { data: game, error: gErr } = await sb.from('games').insert({ player_names: names, game_date: new Date().toISOString().split('T')[0] }).select().single();
             if (gErr) throw gErr;
 
             const results = [];
             document.querySelectorAll('.match-row').forEach(row => {
-                const vals = ['a', 'b', 'c', 'd'].map(col => Number(row.querySelector(`[data-col="${col}"]`).value) || 0);
-                const sorted = vals.map((v, i) => ({ v, i })).sort((a, b) => b.v - a.v);
+                const inputs = Array.from(row.querySelectorAll('.sc-in'));
+                if(inputs.every(i => i.value === "")) return; // 空行はスキップ
+                const vals = inputs.map(i => Number(i.value) || 0);
+                const sorted = [...vals].sort((a, b) => b - a);
                 names.forEach((name, i) => {
                     results.push({ 
                         game_id: game.id, 
                         player_id: mstr.find(m => m.name === name).id,
                         player_name: name,
                         score: vals[i],
-                        rank: sorted.findIndex(x => x.i === i) + 1
+                        rank: sorted.indexOf(vals[i]) + 1
                     });
                 });
             });
@@ -117,19 +160,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 total_score: Number(document.getElementById(`tot-${['a','b','c','d'][i]}`).innerText),
                 tips: Number(document.querySelector(`.tip-in[data-col="${['a','b','c','d'][i]}"]`).value) || 0,
                 coins: Number(document.getElementById(`coin-${['a','b','c','d'][i]}`).innerText),
-                final_rank: 0 // 必要に応じ事後計算
+                final_rank: 0 
             }));
 
             await sb.from('game_results').insert(results);
             await sb.from('set_summaries').insert(summaries);
-            
             location.href = "history.html";
         } catch (e) { alert(e.message); btn.disabled = false; }
     };
 
     document.getElementById('add-row').onclick = addMatchRow;
-    document.querySelectorAll('.tip-in').forEach(i => i.addEventListener('input', updateCalcs));
-    
+    document.querySelectorAll('.tip-in').forEach(setupInputEvents);
     initRoster();
     for(let i=0; i<3; i++) addMatchRow();
 });

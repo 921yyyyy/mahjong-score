@@ -228,9 +228,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             // --- 既存の insert 処理のあとに追加 ---
             await sb.from('set_summaries').insert(summaries);
 
-            // ★ここから「操作ログ」の保存
+                        // ★ここから「操作ログ」の保存（game.id を紐付け！）
             const logData = {
                 action_type: 'SYNC',
+                target_game_id: game.id, // すでに上で定義されている game.id を使用
                 player_names: names,
                 details: `${names.join(', ')} の対局結果を保存`,
                 raw_data: {
@@ -240,6 +241,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
             await sb.from('action_logs').insert(logData);
             // ★ここまで追加
+
 
             location.href = "history.html";
 

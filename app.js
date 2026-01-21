@@ -251,3 +251,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     initRoster();
     for(let i=0; i<3; i++) addMatchRow();
 });
+// --- 既存のコードが上にある ---
+// ... (中略) ...
+// location.href = "history.html"; などが最後にあるはず
+
+// ==========================================
+// ★ ここから末尾に追記：裏管理モード起動ロジック
+// ==========================================
+let entryTapCount = 0;
+let entryTapTimer;
+
+// DOMが読み込まれてからボタンを探すようにイベントリスナーで囲むとより確実です
+document.addEventListener('DOMContentLoaded', () => {
+    const entryTrigger = document.getElementById('admin-trigger');
+
+    if (entryTrigger) {
+        entryTrigger.addEventListener('click', () => {
+            entryTapCount++;
+            
+            // 2秒以内に連続で叩かないとリセット
+            clearTimeout(entryTapTimer);
+            entryTapTimer = setTimeout(() => {
+                entryTapCount = 0;
+            }, 2000);
+
+            if (entryTapCount === 5) {
+                entryTapCount = 0;
+                const pass = prompt("Enter Admin Password:");
+                
+                if (pass === "Gemini") {
+                    alert("ACCESS GRANTED.");
+                    location.href = "admin.html";
+                } else if (pass !== null) {
+                    alert("Invalid Password.");
+                }
+            }
+        });
+    }
+});
+

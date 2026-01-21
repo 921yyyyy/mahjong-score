@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYSTEM ADMIN</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { background-color: #000; color: #00ff41; font-family: 'Courier New', monospace; }
+        .admin-border { border: 1px solid #00ff41; }
+        .btn-danger { border: 1px solid #ff0000; color: #ff0000; padding: 2px 8px; }
+        .btn-danger:hover { background: #ff0000; color: #000; }
+    </style>
+</head>
+<body class="p-4">
+    <h1 class="text-2xl font-bold border-b border-green-500 mb-6">ADMIN DASHBOARD</h1>
+    
+    <div class="admin-border p-4 mb-6 bg-green-900/10">
+        <p>SYSTEM STATUS: <span class="animate-pulse">ONLINE</span></p>
+        <p>SECURITY LEVEL: ALPHA</p>
+    </div>
+
+    <h2 class="text-lg mb-4 underline">RECENT ACTION LOGS</h2>
+    <div id="log-container" class="space-y-4">
+        <p class="text-gray-500 italic">Fetching logs from Supabase...</p>
+    </div>
+
+    <div class="mt-10 text-center">
+        <button onclick="location.href='index.html'" class="admin-border px-4 py-2 hover:bg-green-500 hover:text-black transition">
+            [ EXIT SYSTEM ]
+        </button>
+    </div>
+
+    <script>
+        // ここに supabase 接続情報（直書き）
+        const S_URL = "あなたのURL";
+        const S_KEY = "あなたのKEY";
+        const sb = supabase.createClient(S_URL, S_KEY);
+
+        async function fetchLogs() {
+            const { data, error } = await sb
+                .from('action_logs')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(10);
+
+            const container = document.getElementById('log-container');
+            if (error) {
+                container.innerHTML = `<p class="text-red-500">ERROR: ${error.message}</p>`;
+                return;
+            }
+
+            container.innerHTML = data.map(log => `
+                <div class="admin-border p-2 text-sm relative">
+                    <p class="text-xs text-green-700">${new Date(log.created_at).toLocaleString()}</p>
+                    <p>TYPE: ${log.action_type}</p>
+                    <p>INFO: ${log.details || 'N/A'}</p>
+                    <button class="btn-danger mt-2 text-xs"> [ ROLLBACK / DELETE ] </button>
+                </div>
+            `).join('');
+        }
+
+        fetchLogs();
+    </script>
+</body>
+</html>

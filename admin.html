@@ -85,32 +85,45 @@
         }
 
         // --- 一括削除実行 ---
-        async function bulkDelete() {
-            const selected = Array.from(document.querySelectorAll('input[name="log-select"]:checked'))
-                                  .map(cb => cb.value);
+                async function bulkDelete() {
+            const selectedChecks = Array.from(document.querySelectorAll('input[name="log-select"]:checked'));
+            const selectedLogIds = selectedChecks.map(cb => cb.value);
 
-            if (selected.length === 0) {
+            if (selectedLogIds.length === 0) {
                 alert("SELECT LOGS TO PURGE.");
                 return;
             }
 
-            if (!confirm(`警告: 選択された ${selected.length} 件のログを完全消去します。よろしいですか？`)) {
+            if (!confirm(`警告: 選択された ${selectedLogIds.length} 件のセッションを、全テーブルから完全抹消します。よろしいですか？`)) {
                 return;
             }
 
-            // Supabaseで一括削除
-            const { error } = await sb
+            // 1. ログから対象となる game_id を抽出
+            const { data: logs } = await sb
                 .from('action_logs')
-                .delete()
-                .in('id', selected);
+                .select('target_game_id')
+                .in('id', selectedLogIds);
+
+            const gameIds = logs.map(l => l.target_game_id).filter(id => id);
+
+            if (gameIds.length > 0) {
+                // 2. 関連する全テーブルからデータを消去（一撃で全て消えます）
+                await sb.from('game_results').delete().in('game_id', gameIds);
+                await sb.from('set_summaries').delete().in('game_id', gameIds);
+                await sb.from('games').delete().in('id', gameIds);
+            }
+
+            // 3. 最後にログ自体を消去
+            const { error } = await sb.from('action_logs').delete().in('id', selectedLogIds);
 
             if (error) {
-                alert("CRITICAL ERROR: " + error.message);
+                alert("ERROR: " + error.message);
             } else {
-                alert(`SYSTEM: ${selected.length} ITEMS PURGED.`);
-                fetchLogs(); // リスト再読み込み
+                alert("SYSTEM: TARGET DATA PURGED SUCCESSFULLY.");
+                fetchLogs();
             }
         }
+
 
         // 初期実行
         fetchLogs();

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYSTEM ADMIN</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { background-color: #000; color: #00ff41; font-family: 'Courier New', monospace; }
+        .admin-border { border: 1px solid #00ff41; }
+        .btn-danger { border: 1px solid #ff0000; color: #ff0000; padding: 4px 12px; }
+        .btn-danger:hover { background: #ff0000; color: #000; }
+        .log-item { transition: all 0.3s; }
+        .log-item:has(input:checked) { background: rgba(255, 0, 0, 0.1); border-color: #ff0000; }
+        input[type="checkbox"] { accent-color: #00ff41; width: 1.2rem; height: 1.2rem; }
+    </style>
+</head>
+<body class="p-4">
+    <h1 class="text-2xl font-bold border-b border-green-500 mb-6">ADMIN DASHBOARD</h1>
+    
+    <div class="admin-border p-4 mb-6 bg-green-900/10 flex justify-between items-center">
+        <div>
+            <p>SYSTEM STATUS: <span class="animate-pulse">ONLINE</span></p>
+            <p>SECURITY LEVEL: ALPHA</p>
+        </div>
+        <button onclick="bulkDelete()" class="btn-danger font-bold">
+            [ EXECUTE PURGE ]
+        </button>
+    </div>
+
+    <div class="flex justify-between items-end mb-4">
+        <h2 class="text-lg underline">RECENT ACTION LOGS</h2>
+        <p class="text-xs text-green-700 font-bold">SELECT ITEMS TO DELETE</p>
+    </div>
+
+    <div id="log-container" class="space-y-4 mb-20">
+        <p class="text-gray-500 italic">Fetching logs from Supabase...</p>
+    </div>
+
+    <div class="fixed bottom-0 left-0 w-full bg-black border-t border-green-900 p-4 text-center">
+        <button onclick="location.href='index.html'" class="admin-border px-8 py-2 hover:bg-green-500 hover:text-black transition">
+            [ EXIT SYSTEM ]
+        </button>
+    </div>
+
+    <script>
+        // --- 接続設定 ---
+        const S_URL = "https://zekfibkimvsfbnctwzti.supabase.co";
+        const S_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpla2ZpYmtpbXZzZmJuY3R3enRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODU5NjYsImV4cCI6MjA4NDE2MTk2Nn0.AjW_4HvApe80USaHTAO_P7WeWaQvPo3xi3cpHm4hrFs";
+        const sb = supabase.createClient(S_URL, S_KEY);
+
+        // --- ログ取得 ---
+        async function fetchLogs() {
+            const container = document.getElementById('log-container');
+            const { data, error } = await sb
+                .from('action_logs')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(20);
+
+            if (error) {
+                container.innerHTML = `<p class="text-red-500">ERROR: ${error.message}</p>`;
+                return;
+            }
+
+            if (data.length === 0) {
+                container.innerHTML = `<p class="text-gray-500">No logs found.</p>`;
+                return;
+            }
+
+            container.innerHTML = data.map(log => `
+                <label class="log-item admin-border p-3 flex items-start gap-4 cursor-pointer block">
+                    <input type="checkbox" name="log-select" value="${log.id}" class="mt-1">
+                    <div class="flex-grow">
+                        <div class="flex justify-between">
+                            <span class="text-xs text-green-700">${new Date(log.created_at).toLocaleString()}</span>
+                            <span class="text-xs font-bold text-green-300">ID: ${log.id.slice(0,8)}</span>
+                        </div>
+                        <p class="mt-1 font-bold">TYPE: ${log.action_type}</p>
+                        <p class="text-sm opacity-80 italic">${log.details || 'No details available'}</p>
+                    </div>
+                </label>
+            `).join('');
+        }
+
+        // --- 一括削除実行 ---
+                async function bulkDelete() {
+            const selectedChecks = Array.from(document.querySelectorAll('input[name="log-select"]:checked'));
+            const selectedLogIds = selectedChecks.map(cb => cb.value);
+
+            if (selectedLogIds.length === 0) {
+                alert("SELECT LOGS TO PURGE.");
+                return;
+            }
+
+            if (!confirm(`警告: 選択された ${selectedLogIds.length} 件のセッションを、全テーブルから完全抹消します。よろしいですか？`)) {
+                return;
+            }
+
+            // 1. ログから対象となる game_id を抽出
+            const { data: logs } = await sb
+                .from('action_logs')
+                .select('target_game_id')
+                .in('id', selectedLogIds);
+
+            const gameIds = logs.map(l => l.target_game_id).filter(id => id);
+
+            if (gameIds.length > 0) {
+                // 2. 関連する全テーブルからデータを消去（一撃で全て消えます）
+                await sb.from('game_results').delete().in('game_id', gameIds);
+                await sb.from('set_summaries').delete().in('game_id', gameIds);
+                await sb.from('games').delete().in('id', gameIds);
+            }
+
+            // 3. 最後にログ自体を消去
+            const { error } = await sb.from('action_logs').delete().in('id', selectedLogIds);
+
+            if (error) {
+                alert("ERROR: " + error.message);
+            } else {
+                alert("SYSTEM: TARGET DATA PURGED SUCCESSFULLY.");
+                fetchLogs();
+            }
+        }
+
+
+        // 初期実行
+        fetchLogs();
+    </script>
+</body>
+</html>

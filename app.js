@@ -224,9 +224,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 // --- 既存のコード (ここまで) ---
 
 
-            await sb.from('game_results').insert(results);
+        
+            // --- 既存の insert 処理のあとに追加 ---
             await sb.from('set_summaries').insert(summaries);
+
+                        // ★ここから「操作ログ」の保存（game.id を紐付け！）
+            const logData = {
+                action_type: 'SYNC',
+                target_game_id: game.id, // すでに上で定義されている game.id を使用
+                player_names: names,
+                details: `${names.join(', ')} の対局結果を保存`,
+                raw_data: {
+                    match_results: results,
+                    summaries: summaries
+                }
+            };
+            await sb.from('action_logs').insert(logData);
+            // ★ここまで追加
+
+
             location.href = "history.html";
+
         } catch (e) { alert(e.message); btn.disabled = false; }
     };
 
@@ -235,3 +253,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     initRoster();
     for(let i=0; i<3; i++) addMatchRow();
 });
+// --- 既存のコードが上にある ---
+// ... (中略) ...
+// location.href = "history.html"; などが最後にあるはず
+
+// ==========================================
+// ★ ここから末尾に追記：裏管理モード起動ロジック
+// ==========================================
+let entryTapCount = 0;
+let entryTapTimer;
+
+// DOMが読み込まれてからボタンを探すようにイベントリスナーで囲むとより確実です
+document.addEventListener('DOMContentLoaded', () => {
+    const entryTrigger = document.getElementById('admin-trigger');
+
+    if (entryTrigger) {
+        entryTrigger.addEventListener('click', () => {
+            entryTapCount++;
+            
+            // 2秒以内に連続で叩かないとリセット
+            clearTimeout(entryTapTimer);
+            entryTapTimer = setTimeout(() => {
+                entryTapCount = 0;
+            }, 2000);
+
+            if (entryTapCount === 5) {
+                entryTapCount = 0;
+                const pass = prompt("Enter Admin Password:");
+                
+                if (pass === "Gemini") {
+                    alert("ACCESS GRANTED.");
+                    location.href = "admin.html";
+                } else if (pass !== null) {
+                    alert("Invalid Password.");
+                }
+            }
+        });
+    }
+});
+
